@@ -16,6 +16,8 @@ import OrderDetails from './pages/OrderDetails';
 import VendorDashboard from './pages/VendorDashboard';
 import VendorProductForm from './pages/VendorProductForm';
 import AdminDashboard from './pages/AdminDashboard';
+import About from './pages/About';
+import Contact from './pages/Contact';
 import './App.css';
 
 function App() {
@@ -46,6 +48,8 @@ function App() {
                 <Route path="/vendor/products/new" element={<VendorProductForm />} />
                 <Route path="/vendor/products/:id/edit" element={<VendorProductForm />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
               </Routes>
             </main>
             <Footer />

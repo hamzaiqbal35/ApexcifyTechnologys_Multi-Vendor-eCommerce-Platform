@@ -37,6 +37,12 @@ const Header = () => {
             <Link to="/products" className="text-gray-700 hover:text-blue-600">
               Products
             </Link>
+            <Link to="/about" className="text-gray-700 hover:text-blue-600">
+              About
+            </Link>
+            <Link to="/contact" className="text-gray-700 hover:text-blue-600">
+              Contact
+            </Link>
             {isAuthenticated && (
               <>
                 {user.role === 'vendor' && (
