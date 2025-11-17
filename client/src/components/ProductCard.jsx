@@ -5,7 +5,7 @@ import { formatPricePKR } from '../utils/currency';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   const handleAddToCart = async (e) => {
     e.preventDefault();
@@ -88,13 +88,15 @@ const ProductCard = ({ product }) => {
           <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
             {product.stock > 0 ? `In Stock (${product.stock})` : 'Out of Stock'}
           </span>
-          <button
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            Add to Cart
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={handleAddToCart}
+              disabled={product.stock === 0}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              Add to Cart
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -159,12 +159,12 @@ const Checkout = () => {
                 <input
                   type="radio"
                   name="paymentMethod"
-                  value="paypal"
-                  checked={formData.paymentMethod === 'paypal'}
+                  value="bank_transfer"
+                  checked={formData.paymentMethod === 'bank_transfer'}
                   onChange={handleChange}
                   className="mr-2"
                 />
-                PayPal
+                Bank Transfer
               </label>
               <label className="flex items-center">
                 <input

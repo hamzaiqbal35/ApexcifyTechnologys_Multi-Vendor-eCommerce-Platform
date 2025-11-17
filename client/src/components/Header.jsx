@@ -3,6 +3,15 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const FILE_BASE_URL = API_URL.replace(/\/api$/, '');
+
+const getAvatarUrl = (avatar) => {
+  if (!avatar) return '';
+  if (avatar.startsWith('http')) return avatar;
+  return `${FILE_BASE_URL}${avatar}`;
+};
+
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { cartItemCount } = useCart();
@@ -20,6 +29,15 @@ const Header = () => {
   const isActive = (path) => {
     return location.pathname === path;
   };
+
+  // Hide About/Contact for vendor or admin users everywhere (header only)
+  const isVendorOrAdminUser =
+    isAuthenticated && (user?.role === 'vendor' || user?.role === 'admin');
+
+  const isAdminUser = isAuthenticated && user?.role === 'admin';
+  
+  // Hide About/Contact when any user is logged in
+  const shouldHideAboutContact = isAuthenticated;
 
   const NavLink = ({ to, children, className = '' }) => (
     <Link
@@ -64,8 +82,12 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">
             <NavLink to="/products">Products</NavLink>
-            <NavLink to="/about">About</NavLink>
-            <NavLink to="/contact">Contact</NavLink>
+            {!shouldHideAboutContact && (
+              <>
+                <NavLink to="/about">About</NavLink>
+                <NavLink to="/contact">Contact</NavLink>
+              </>
+            )}
             {isAuthenticated && (
               <>
                 {user.role === 'vendor' && (
@@ -74,7 +96,7 @@ const Header = () => {
                 {user.role === 'admin' && (
                   <NavLink to="/admin/dashboard">Admin Dashboard</NavLink>
                 )}
-                <NavLink to="/orders">My Orders</NavLink>
+                {!isAdminUser && <NavLink to="/orders">My Orders</NavLink>}
               </>
             )}
           </nav>
@@ -83,30 +105,32 @@ const Header = () => {
           <div className="flex items-center space-x-3">
             {isAuthenticated ? (
               <>
-                {/* Cart Icon */}
-                <Link 
-                  to="/cart" 
-                  className="relative p-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group"
-                >
-                  <svg 
-                    className="w-6 h-6 transition-transform duration-200 group-hover:scale-110" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
+                {/* Cart Icon (hidden for admin) */}
+                {!isAdminUser && (
+                  <Link 
+                    to="/cart" 
+                    className="relative p-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
-                    />
-                  </svg>
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse shadow-lg">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </Link>
+                    <svg 
+                      className="w-6 h-6 transition-transform duration-200 group-hover:scale-110" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
+                      />
+                    </svg>
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse shadow-lg">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
 
                 {/* User Menu */}
                 <div className="relative">
@@ -114,8 +138,16 @@ const Header = () => {
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200 group"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                      {user.name?.charAt(0).toUpperCase() || 'U'}
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                      {user.avatar ? (
+                        <img
+                          src={getAvatarUrl(user.avatar)}
+                          alt={user.name || 'Avatar'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.name?.charAt(0).toUpperCase() || 'U'
+                      )}
                     </div>
                     <span className="hidden md:block text-gray-700 font-medium group-hover:text-blue-600 transition-colors">
                       {user.name}
@@ -169,26 +201,28 @@ const Header = () => {
                           </svg>
                           Profile
                         </Link>
-                        <Link
-                          to="/orders"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <svg
-                            className="w-4 h-4 mr-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        {!isAdminUser && (
+                          <Link
+                            to="/orders"
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
+                            onClick={() => setUserMenuOpen(false)}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                            />
-                          </svg>
-                          My Orders
-                        </Link>
+                            <svg
+                              className="w-4 h-4 mr-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                              />
+                            </svg>
+                            My Orders
+                          </Link>
+                        )}
                         <div className="border-t border-gray-100 my-1"></div>
                         <button
                           onClick={handleLogout}
@@ -268,8 +302,12 @@ const Header = () => {
           <div className="lg:hidden border-t border-gray-100 py-4 animate-in">
             <nav className="flex flex-col space-y-1">
               <NavLink to="/products" className="block">Products</NavLink>
-              <NavLink to="/about" className="block">About</NavLink>
-              <NavLink to="/contact" className="block">Contact</NavLink>
+              {!shouldHideAboutContact && (
+                <>
+                  <NavLink to="/about" className="block">About</NavLink>
+                  <NavLink to="/contact" className="block">Contact</NavLink>
+                </>
+              )}
               {isAuthenticated && (
                 <>
                   {user.role === 'vendor' && (
@@ -278,7 +316,9 @@ const Header = () => {
                   {user.role === 'admin' && (
                     <NavLink to="/admin/dashboard" className="block">Admin Dashboard</NavLink>
                   )}
-                  <NavLink to="/orders" className="block">My Orders</NavLink>
+                  {!isAdminUser && (
+                    <NavLink to="/orders" className="block">My Orders</NavLink>
+                  )}
                 </>
               )}
             </nav>

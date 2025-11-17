@@ -1,15 +1,41 @@
 // Email service using nodemailer
-// For production, configure with actual SMTP settings
+// Make sure you have valid SMTP_* variables in your .env file
 const nodemailer = require('nodemailer');
+
+// Normalise env values
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM =
+  process.env.SMTP_FROM ||
+  (SMTP_USER ? SMTP_USER : 'fluxmart35@gmail.com');
 
 // Create transporter (configure with your email service)
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || ''
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465 || process.env.SMTP_SECURE === 'true', // true for 465, false for others
+  auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined
+});
+
+// Log configuration problems early instead of silently doing nothing
+if (!SMTP_USER || !SMTP_PASS) {
+  console.warn(
+    '[emailService] SMTP_USER or SMTP_PASS is missing. Emails will NOT be sent. ' +
+      'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS (and optional SMTP_FROM) in server/.env.'
+  );
+}
+
+// Verify transporter on startup to catch mis‑configuration
+transporter.verify((err, success) => {
+  if (err) {
+    console.error(
+      '[emailService] SMTP configuration is invalid. Emails will fail to send:',
+      err.message || err
+    );
+  } else {
+    console.log('[emailService] SMTP server is ready to take messages.');
   }
 });
 
@@ -24,13 +50,13 @@ const sendOrderConfirmationEmail = async (userEmail, orders) => {
 Order #${order._id}
 Items:
 ${items}
-Total: $${order.totalPrice}
+Total: ${order.totalPrice} PKR
 Status: ${order.status}
       `;
     }).join('\n\n');
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'noreply@ecommerce.com',
+      from: SMTP_FROM,
       to: userEmail,
       subject: 'Order Confirmation',
       html: `
@@ -56,7 +82,7 @@ Status: ${order.status}
 const sendOrderStatusUpdateEmail = async (userEmail, order) => {
   try {
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'noreply@ecommerce.com',
+      from: SMTP_FROM,
       to: userEmail,
       subject: `Order #${order._id} Status Update`,
       html: `
@@ -78,8 +104,40 @@ const sendOrderStatusUpdateEmail = async (userEmail, order) => {
   }
 };
 
+const sendPasswordResetEmail = async (userEmail, resetUrl) => {
+  try {
+    const mailOptions = {
+      from: SMTP_FROM,
+      to: userEmail,
+      subject: 'Password Reset Request',
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>You requested to reset your password. Click the button below to set a new password:</p>
+        <p>
+          <a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">
+            Reset Password
+          </a>
+        </p>
+        <p>If the button does not work, copy and paste this link in your browser:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>If you did not request this, you can ignore this email.</p>
+      `
+    };
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail(mailOptions);
+    } else {
+      console.log('Password reset email would be sent:', mailOptions);
+    }
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendOrderConfirmationEmail,
-  sendOrderStatusUpdateEmail
+  sendOrderStatusUpdateEmail,
+  sendPasswordResetEmail
 };
 

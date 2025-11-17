@@ -13,7 +13,6 @@ const AdminDashboard = () => {
     totalProducts: 0,
     totalOrders: 0,
     totalRevenue: 0,
-    activeDisputes: 0
   });
 
   // Data states
@@ -21,7 +20,6 @@ const AdminDashboard = () => {
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [disputes, setDisputes] = useState([]);
   const [categories, setCategories] = useState([]);
   const [analytics, setAnalytics] = useState({});
 
@@ -50,8 +48,6 @@ const AdminDashboard = () => {
         await fetchProducts();
       } else if (activeTab === 'orders') {
         await fetchOrders();
-      } else if (activeTab === 'disputes') {
-        await fetchDisputes();
       } else if (activeTab === 'categories') {
         await fetchCategories();
       }
@@ -85,7 +81,6 @@ const AdminDashboard = () => {
         totalProducts: (productsRes.data.products || []).length,
         totalOrders: (ordersRes.data.orders || []).length,
         totalRevenue,
-        activeDisputes: disputes.length
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -160,21 +155,6 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
-  };
-
-  const fetchDisputes = async () => {
-    // Mock disputes data - replace with actual API call
-    setDisputes([
-      {
-        _id: '1',
-        orderId: 'order123',
-        customer: { name: 'John Doe', email: 'john@example.com' },
-        vendor: { name: 'Vendor ABC', email: 'vendor@example.com' },
-        reason: 'Product not as described',
-        status: 'open',
-        createdAt: new Date()
-      }
-    ]);
   };
 
   const fetchCategories = async () => {
@@ -255,12 +235,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleResolveDispute = async (disputeId) => {
-    // Mock implementation - replace with actual API call
-    setDisputes(disputes.filter(d => d._id !== disputeId));
-    alert('Dispute resolved');
-  };
-
   const handleAddCategory = async (categoryName) => {
     if (!categoryName.trim()) return;
     // Mock implementation - replace with actual API call
@@ -279,10 +253,8 @@ const AdminDashboard = () => {
     { id: 'users', label: 'Users', icon: '👥' },
     { id: 'products', label: 'Products', icon: '📦' },
     { id: 'orders', label: 'Orders', icon: '🛒' },
-    { id: 'disputes', label: 'Disputes', icon: '⚖️', badge: disputes.filter(d => d.status === 'open').length },
     { id: 'categories', label: 'Categories', icon: '🏷️' },
     { id: 'reports', label: 'Reports', icon: '📄' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
     { id: 'analytics', label: 'Analytics', icon: '📈' }
   ];
 
@@ -292,7 +264,7 @@ const AdminDashboard = () => {
         <div className="bg-white shadow-sm border-b">
           <div className="container mx-auto px-4 py-4">
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage your e-commerce platform</p>
+            <p className="text-gray-600 mt-1">Manage your Business</p>
           </div>
         </div>
 
@@ -366,12 +338,6 @@ const AdminDashboard = () => {
                     onSearchChange={setSearchTerm}
                   />
                 )}
-                {activeTab === 'disputes' && (
-                  <DisputesTab
-                    disputes={disputes}
-                    onResolve={handleResolveDispute}
-                  />
-                )}
                 {activeTab === 'categories' && (
                   <CategoriesTab
                     categories={categories}
@@ -380,7 +346,6 @@ const AdminDashboard = () => {
                   />
                 )}
                 {activeTab === 'reports' && <ReportsTab orders={orders} products={products} users={users} />}
-                {activeTab === 'settings' && <SettingsTab />}
                 {activeTab === 'analytics' && <AnalyticsTab analytics={analytics} stats={stats} />}
               </>
             )}
@@ -427,12 +392,6 @@ const OverviewTab = ({ stats }) => (
         value={formatPricePKR(stats.totalRevenue)}
         icon="💰"
         color="green"
-      />
-      <StatCard
-        title="Active Disputes"
-        value={stats.activeDisputes}
-        icon="⚖️"
-        color="red"
       />
     </div>
   </div>
@@ -805,43 +764,6 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange }) => {
   );
 };
 
-// Disputes Tab Component
-const DisputesTab = ({ disputes, onResolve }) => (
-  <div>
-    <h2 className="text-2xl font-bold mb-6">Dispute Management</h2>
-    {disputes.length > 0 ? (
-      <div className="space-y-4">
-        {disputes.map((dispute) => (
-          <div key={dispute._id} className="border border-red-200 rounded-lg p-4 bg-red-50">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-semibold text-lg">Dispute #{dispute._id}</h4>
-                <p className="text-sm text-gray-600 mt-1">Order: {dispute.orderId}</p>
-                <p className="text-sm mt-2"><strong>Customer:</strong> {dispute.customer.name}</p>
-                <p className="text-sm"><strong>Vendor:</strong> {dispute.vendor.name}</p>
-                <p className="text-sm mt-2"><strong>Reason:</strong> {dispute.reason}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Created: {new Date(dispute.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => onResolve(dispute._id)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Resolve
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p className="text-gray-500">No active disputes</p>
-    )}
-  </div>
-);
-
 // Categories Tab Component
 const CategoriesTab = ({ categories, onAdd, onDelete }) => {
   const [newCategory, setNewCategory] = useState('');
@@ -917,81 +839,6 @@ const ReportsTab = ({ orders, products, users }) => (
     </div>
   </div>
 );
-
-// Settings Tab Component
-const SettingsTab = () => {
-  const [settings, setSettings] = useState({
-    platformName: 'Fluxmart',
-    maintenanceMode: false,
-    allowRegistration: true,
-    minOrderAmount: 0,
-    commissionRate: 5
-  });
-
-  const handleSave = () => {
-    // Mock implementation - replace with actual API call
-    alert('Settings saved successfully!');
-  };
-
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Platform Settings</h2>
-      <div className="space-y-6 max-w-2xl">
-        <div>
-          <label className="block text-sm font-medium mb-2">Platform Name</label>
-          <input
-            type="text"
-            value={settings.platformName}
-            onChange={(e) => setSettings({...settings, platformName: e.target.value})}
-            className="w-full px-4 py-2 border rounded-lg"
-          />
-        </div>
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={settings.maintenanceMode}
-            onChange={(e) => setSettings({...settings, maintenanceMode: e.target.checked})}
-            className="w-4 h-4"
-          />
-          <label>Maintenance Mode</label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={settings.allowRegistration}
-            onChange={(e) => setSettings({...settings, allowRegistration: e.target.checked})}
-            className="w-4 h-4"
-          />
-          <label>Allow New User Registration</label>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-2">Minimum Order Amount</label>
-          <input
-            type="number"
-            value={settings.minOrderAmount}
-            onChange={(e) => setSettings({...settings, minOrderAmount: e.target.value})}
-            className="w-full px-4 py-2 border rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-2">Commission Rate (%)</label>
-          <input
-            type="number"
-            value={settings.commissionRate}
-            onChange={(e) => setSettings({...settings, commissionRate: e.target.value})}
-            className="w-full px-4 py-2 border rounded-lg"
-          />
-        </div>
-        <button
-          onClick={handleSave}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Save Settings
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // Analytics Tab Component
 const AnalyticsTab = ({ analytics, stats }) => (

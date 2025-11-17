@@ -11,6 +11,8 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import VendorDashboard from './pages/VendorDashboard';
@@ -18,6 +20,7 @@ import VendorProductForm from './pages/VendorProductForm';
 import AdminDashboard from './pages/AdminDashboard';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import Profile from './pages/Profile';
 import './App.css';
 
 function App() {
@@ -42,8 +45,11 @@ function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/orders/:id" element={<OrderDetails />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/vendor/dashboard" element={<VendorDashboard />} />
                 <Route path="/vendor/products/new" element={<VendorProductForm />} />
                 <Route path="/vendor/products/:id/edit" element={<VendorProductForm />} />

@@ -9,7 +9,7 @@ const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVendor, isAdmin } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -31,10 +31,16 @@ const ProductDetails = () => {
     }
   };
 
+  const VENDOR_BULK_MIN = 10;
+
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
       alert('Please login to add items to cart');
       navigate('/login');
+      return;
+    }
+    if (isVendor && quantity < VENDOR_BULK_MIN) {
+      alert(`As a vendor, you can only place bulk orders. Minimum quantity is ${VENDOR_BULK_MIN}.`);
       return;
     }
     try {
@@ -127,21 +133,27 @@ const ProductDetails = () => {
             <label className="font-semibold">Quantity:</label>
             <input
               type="number"
-              min="1"
+              min={isVendor ? VENDOR_BULK_MIN : 1}
               max={product.stock}
               value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                const min = isVendor ? VENDOR_BULK_MIN : 1;
+                setQuantity(value < min ? min : value);
+              }}
               className="w-20 px-3 py-2 border rounded"
             />
           </div>
 
-          <button
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-            className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            Add to Cart
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={handleAddToCart}
+              disabled={product.stock === 0}
+              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              Add to Cart
+            </button>
+          )}
         </div>
       </div>
 

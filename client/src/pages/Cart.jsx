@@ -6,7 +6,7 @@ import { formatPricePKR } from '../utils/currency';
 
 const Cart = () => {
   const { cart, loading, updateCartItem, removeFromCart, cartTotal } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVendor } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,10 +36,16 @@ const Cart = () => {
     );
   }
 
+  const VENDOR_BULK_MIN = 10;
+
   const handleQuantityChange = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
     const item = cart.items.find(i => i._id === itemId);
     const product = item.product;
+    if (isVendor && newQuantity < VENDOR_BULK_MIN) {
+      alert(`As a vendor, you can only place bulk orders. Minimum quantity per item is ${VENDOR_BULK_MIN}.`);
+      return;
+    }
     if (newQuantity > product.stock) {
       alert(`Only ${product.stock} items available in stock`);
       return;

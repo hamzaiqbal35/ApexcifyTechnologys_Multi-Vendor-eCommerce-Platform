@@ -1,6 +1,8 @@
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 
+const VENDOR_BULK_MIN = 10;
+
 // @desc    Get user cart
 // @route   GET /api/cart
 // @access  Private
@@ -48,15 +50,29 @@ const addToCart = async (req, res) => {
       item => item.product.toString() === productId
     );
 
+    let newQuantity;
     if (existingItem) {
-      existingItem.quantity += quantity;
-      if (existingItem.quantity > product.stock) {
-        return res.status(400).json({ message: 'Insufficient stock' });
-      }
+      newQuantity = existingItem.quantity + quantity;
+    } else {
+      newQuantity = quantity;
+    }
+
+    if (req.user.role === 'vendor' && newQuantity < VENDOR_BULK_MIN) {
+      return res.status(400).json({
+        message: `Vendors can only place bulk orders. Minimum quantity per item is ${VENDOR_BULK_MIN}.`
+      });
+    }
+
+    if (newQuantity > product.stock) {
+      return res.status(400).json({ message: 'Insufficient stock' });
+    }
+
+    if (existingItem) {
+      existingItem.quantity = newQuantity;
     } else {
       cart.items.push({
         product: productId,
-        quantity,
+        quantity: newQuantity,
         price: product.price
       });
     }
@@ -95,6 +111,12 @@ const updateCartItem = async (req, res) => {
     const product = await Product.findById(item.product);
     if (quantity > product.stock) {
       return res.status(400).json({ message: 'Insufficient stock' });
+    }
+
+    if (req.user.role === 'vendor' && quantity < VENDOR_BULK_MIN) {
+      return res.status(400).json({
+        message: `Vendors can only place bulk orders. Minimum quantity per item is ${VENDOR_BULK_MIN}.`
+      });
     }
 
     item.quantity = quantity;
