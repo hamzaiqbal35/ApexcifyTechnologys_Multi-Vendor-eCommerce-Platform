@@ -135,7 +135,7 @@ const sendPasswordResetEmail = async (userEmail, resetUrl) => {
   }
 };
 
-const sendContactEmail = async (name, email, subject, message) => {
+const sendContactEmail = async (name, email, subject, message, attachmentInfo = null) => {
   try {
     const mailOptions = {
       from: SMTP_FROM,
@@ -147,9 +147,16 @@ const sendContactEmail = async (name, email, subject, message) => {
         <p><strong>Subject:</strong> ${subject}</p>
         <p><strong>Message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
+        ${attachmentInfo ? `<p><strong>Attachment:</strong> ${attachmentInfo.filename}</p>` : ''}
         <hr>
         <p><strong>Reply to:</strong> <a href="mailto:${email}">${email}</a></p>
-      `
+      `,
+      attachments: attachmentInfo ? [
+        {
+          filename: attachmentInfo.filename,
+          path: attachmentInfo.path
+        }
+      ] : []
     };
 
     // Also send confirmation to user
@@ -163,6 +170,7 @@ const sendContactEmail = async (name, email, subject, message) => {
         <p>We have received your message and will get back to you as soon as possible.</p>
         <p><strong>Your message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
+        ${attachmentInfo ? `<p><strong>You attached:</strong> ${attachmentInfo.filename}</p>` : ''}
         <hr>
         <p>Best regards,<br>FluxMart Support Team</p>
       `

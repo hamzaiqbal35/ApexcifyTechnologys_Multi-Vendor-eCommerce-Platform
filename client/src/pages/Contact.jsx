@@ -5,30 +5,77 @@ const Contact = () => {
     name: '',
     email: '',
     subject: '',
-    message: ''
+    message: '',
+    attachment: null
   });
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
+  const [fileError, setFileError] = useState('');
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setFileError('');
+
+    if (file) {
+      // Validate file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        setFileError('File size must be less than 5MB');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'text/plain'
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        setFileError('Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT');
+        return;
+      }
+
+      setFormData({ ...formData, attachment: file });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setStatus({ type: '', message: '' });
+    setFileError('');
 
     try {
       // Use VITE_API_URL environment variable (already includes /api)
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       
+      // Create FormData to handle file upload
+      const submitData = new FormData();
+      submitData.append('name', formData.name);
+      submitData.append('email', formData.email);
+      submitData.append('subject', formData.subject);
+      submitData.append('message', formData.message);
+      
+      if (formData.attachment) {
+        submitData.append('attachment', formData.attachment);
+      }
+
       const response = await fetch(`${apiUrl}/contact`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        body: submitData,
+        // Don't set Content-Type header - let the browser set it with boundary
       });
 
       const data = await response.json();
@@ -38,7 +85,10 @@ const Contact = () => {
           type: 'success',
           message: 'Thank you for contacting us! We will get back to you soon.'
         });
-        setFormData({ name: '', email: '', subject: '', message: '' });
+        setFormData({ name: '', email: '', subject: '', message: '', attachment: null });
+        // Clear file input
+        const fileInput = document.getElementById('attachment');
+        if (fileInput) fileInput.value = '';
       } else {
         setStatus({
           type: 'error',
@@ -132,7 +182,7 @@ const Contact = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                     Name *
@@ -142,6 +192,7 @@ const Contact = () => {
                     id="name"
                     name="name"
                     required
+                    autoComplete="name"
                     value={formData.name}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
@@ -158,6 +209,7 @@ const Contact = () => {
                     id="email"
                     name="email"
                     required
+                    autoComplete="email"
                     value={formData.email}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
@@ -174,6 +226,7 @@ const Contact = () => {
                     id="subject"
                     name="subject"
                     required
+                    autoComplete="off"
                     value={formData.subject}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
@@ -190,11 +243,61 @@ const Contact = () => {
                     name="message"
                     required
                     rows="6"
+                    autoComplete="off"
                     value={formData.message}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-none"
                     placeholder="Tell us more about your inquiry..."
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="attachment" className="block text-sm font-medium text-gray-700 mb-2">
+                    Attach Document (Optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      id="attachment"
+                      name="attachment"
+                      onChange={handleFileChange}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt"
+                      autoComplete="off"
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="attachment"
+                      className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors duration-200"
+                    >
+                      <div className="text-center">
+                        <svg
+                          className="mx-auto h-8 w-8 text-gray-400"
+                          stroke="currentColor"
+                          fill="none"
+                          viewBox="0 0 48 48"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M12 28l-3.172-3.172a4 4 0 00-5.656 0L2 28"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <p className="mt-2 text-sm text-gray-600">
+                          {formData.attachment
+                            ? `📄 ${formData.attachment.name}`
+                            : 'Drag and drop or click to select file'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Max 5MB • PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                  {fileError && (
+                    <p className="mt-2 text-sm text-red-600">{fileError}</p>
+                  )}
                 </div>
 
                 <button
