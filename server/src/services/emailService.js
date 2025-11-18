@@ -15,7 +15,7 @@ const SMTP_FROM =
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: SMTP_PORT === 465 || process.env.SMTP_SECURE === 'true', // true for 465, false for others
+  secure: false, // true for 465, false for others
   auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined
 });
 
