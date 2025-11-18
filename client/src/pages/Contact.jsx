@@ -19,15 +19,41 @@ const Contact = () => {
     setLoading(true);
     setStatus({ type: '', message: '' });
 
-    // Simulate form submission (replace with actual API call)
-    setTimeout(() => {
-      setLoading(false);
-      setStatus({
-        type: 'success',
-        message: 'Thank you for contacting us! We will get back to you soon.'
+    try {
+      // Use VITE_API_URL environment variable (already includes /api)
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      
+      const response = await fetch(`${apiUrl}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 1000);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus({
+          type: 'success',
+          message: 'Thank you for contacting us! We will get back to you soon.'
+        });
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      } else {
+        setStatus({
+          type: 'error',
+          message: data.message || 'Failed to send message. Please try again.'
+        });
+      }
+    } catch (error) {
+      console.error('Contact form error:', error);
+      setStatus({
+        type: 'error',
+        message: 'An error occurred. Please try again later.'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const contactInfo = [

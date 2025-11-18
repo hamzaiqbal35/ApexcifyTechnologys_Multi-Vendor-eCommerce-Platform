@@ -135,9 +135,55 @@ const sendPasswordResetEmail = async (userEmail, resetUrl) => {
   }
 };
 
+const sendContactEmail = async (name, email, subject, message) => {
+  try {
+    const mailOptions = {
+      from: SMTP_FROM,
+      to: SMTP_FROM, // Send to admin email
+      subject: `New Contact Form Submission: ${subject}`,
+      html: `
+        <h2>New Contact Form Submission</h2>
+        <p><strong>From:</strong> ${name} (${email})</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message.replace(/\n/g, '<br>')}</p>
+        <hr>
+        <p><strong>Reply to:</strong> <a href="mailto:${email}">${email}</a></p>
+      `
+    };
+
+    // Also send confirmation to user
+    const confirmationMailOptions = {
+      from: SMTP_FROM,
+      to: email,
+      subject: 'We received your message - FluxMart Support',
+      html: `
+        <h2>Thank you for contacting us!</h2>
+        <p>Hi ${name},</p>
+        <p>We have received your message and will get back to you as soon as possible.</p>
+        <p><strong>Your message:</strong></p>
+        <p>${message.replace(/\n/g, '<br>')}</p>
+        <hr>
+        <p>Best regards,<br>FluxMart Support Team</p>
+      `
+    };
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail(mailOptions);
+      await transporter.sendMail(confirmationMailOptions);
+    } else {
+      console.log('Contact emails would be sent:', { mailOptions, confirmationMailOptions });
+    }
+  } catch (error) {
+    console.error('Error sending contact email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendOrderConfirmationEmail,
   sendOrderStatusUpdateEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendContactEmail
 };
 
