@@ -18,7 +18,7 @@ const Checkout = () => {
       zipCode: user?.address?.zipCode || '',
       country: user?.address?.country || ''
     },
-    paymentMethod: 'card'
+    paymentMethod: 'cash_on_delivery'
   });
 
   useEffect(() => {
@@ -144,28 +144,6 @@ const Checkout = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-bold mb-4">Payment Method</h2>
             <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="card"
-                  checked={formData.paymentMethod === 'card'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Credit/Debit Card
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="bank_transfer"
-                  checked={formData.paymentMethod === 'bank_transfer'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Bank Transfer
-              </label>
               <label className="flex items-center">
                 <input
                   type="radio"
