@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../utils/api';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { formatPricePKR } from '../utils/currency';
+import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -720,7 +721,10 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange }) => {
           <div key={order._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h4 className="font-semibold">Order #{order._id.slice(-8)}</h4>
+                {/* Make order id clickable to go to order details */}
+                <Link to={`/orders/${order._id}`} className="font-semibold text-blue-600 hover:underline">
+                  Order #{order._id.slice(-8)}
+                </Link>
                 <p className="text-sm text-gray-600">
                   {order.user?.name} - {new Date(order.createdAt).toLocaleDateString()}
                 </p>

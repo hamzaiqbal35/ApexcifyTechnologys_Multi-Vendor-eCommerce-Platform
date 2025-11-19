@@ -162,6 +162,16 @@ const VendorDashboard = () => {
                         <span>Total</span>
                         <span>{formatPricePKR(order.totalPrice)}</span>
                       </div>
+
+                      {/* View order button for vendor to open order details */}
+                      <div className="flex justify-end mt-4">
+                        <Link
+                          to={`/orders/${order._id}`}
+                          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"
+                        >
+                          View Order
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 ))}

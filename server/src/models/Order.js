@@ -38,7 +38,7 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['card', 'paypal', 'cash_on_delivery']
+    enum: ['cash_on_delivery']
   },
   paymentResult: {
     id: String,
@@ -71,6 +71,11 @@ const orderSchema = new mongoose.Schema({
     default: false
   },
   paidAt: Date,
+  isShipped: {
+    type: Boolean,
+    default: false
+  },
+  shippedAt: Date,
   isDelivered: {
     type: Boolean,
     default: false
@@ -81,7 +86,33 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
     default: 'pending'
   },
-  trackingNumber: String
+  trackingNumber: String,
+
+  // vendor cancel request / admin review
+  vendorCancelRequested: {
+    type: Boolean,
+    default: false
+  },
+  vendorCancelReason: String,
+  vendorCancelRequestedAt: Date,
+
+  // vendor payment record (when vendor receives payment offline)
+  vendorPayment: {
+    by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    amount: Number,
+    method: String,
+    transactionId: String,
+    receivedAt: Date
+  },
+
+  // cancellation/refund fields
+  cancellationReason: String,
+  cancelledAt: Date,
+  isRefunded: {
+    type: Boolean,
+    default: false
+  },
+  refundedAt: Date
 }, {
   timestamps: true
 });

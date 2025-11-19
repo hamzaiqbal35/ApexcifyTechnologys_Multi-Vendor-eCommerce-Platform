@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const Cart = require('../models/Cart');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
 
@@ -117,6 +118,165 @@ const getMyOrders = async (req, res) => {
   }
 };
 
+// @desc    Update order items (before shipping)
+// @route   PUT /api/orders/:id
+// @access  Private
+const updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { orderItems } = req.body;
+    const userId = req.user._id;
+
+    // Find order
+    const order = await Order.findById(id).populate('orderItems.product').populate('orderItems.vendor');
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check ownership
+    if (order.user.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this order' });
+    }
+
+    // Check if order can be edited
+    if (order.status !== 'pending') {
+      return res.status(400).json({ message: 'Can only edit pending orders' });
+    }
+
+    if (order.isPaid) {
+      return res.status(400).json({ message: 'Cannot edit paid orders' });
+    }
+
+    if (order.isShipped) {
+      return res.status(400).json({ message: 'Cannot edit shipped orders' });
+    }
+
+    // Validate order items
+    if (!orderItems || orderItems.length === 0) {
+      return res.status(400).json({ message: 'Order must contain at least one item' });
+    }
+
+    let itemsPrice = 0;
+    const updatedOrderItems = [];
+
+    for (const item of orderItems) {
+      const product = await Product.findById(item.product);
+
+      if (!product) {
+        return res.status(404).json({ message: `Product ${item.product} not found` });
+      }
+
+      // Check stock
+      if (item.quantity > product.stock) {
+        return res.status(400).json({
+          message: `Not enough stock for ${product.name}. Available: ${product.stock}`
+        });
+      }
+
+      if (item.quantity < 1) {
+        return res.status(400).json({ message: 'Item quantity must be at least 1' });
+      }
+
+      updatedOrderItems.push({
+        name: product.name,
+        quantity: item.quantity,
+        image: product.image || product.images?.[0] || '',
+        price: product.price,
+        product: product._id,
+        vendor: product.vendor
+      });
+
+      itemsPrice += product.price * item.quantity;
+    }
+
+    // Calculate new totals
+    const taxPrice = itemsPrice * 0.1; // 10% tax
+    const shippingPrice = order.shippingPrice; // Keep same shipping
+    const totalPrice = itemsPrice + taxPrice + shippingPrice;
+
+    // Update order
+    order.orderItems = updatedOrderItems;
+    order.itemsPrice = itemsPrice;
+    order.taxPrice = taxPrice;
+    order.totalPrice = totalPrice;
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order updated successfully',
+      order
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Cancel order (before shipping)
+// @route   PUT /api/orders/:id/cancel
+// @access  Private
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.user._id;
+
+    // Find order
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check ownership
+    if (order.user.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'Not authorized to cancel this order' });
+    }
+
+    // Check if order can be cancelled
+    if (!['pending', 'processing'].includes(order.status)) {
+      return res.status(400).json({
+        message: `Cannot cancel ${order.status} orders. Only pending or processing orders can be cancelled.`
+      });
+    }
+
+    if (order.isShipped) {
+      return res.status(400).json({ message: 'Cannot cancel shipped orders' });
+    }
+
+    // Restore product stock
+    for (const item of order.orderItems) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        product.stock += item.quantity;
+        await product.save();
+      }
+    }
+
+    // Update order
+    order.status = 'cancelled';
+    order.cancellationReason = reason;
+    order.cancelledAt = new Date();
+
+    // Process refund if already paid
+    if (order.isPaid) {
+      order.isRefunded = true;
+      order.refundedAt = new Date();
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order cancelled successfully. Refund will be processed within 5-7 business days.',
+      order
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get single order
 // @route   GET /api/orders/:id
 // @access  Private
@@ -124,7 +284,7 @@ const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email')
-      .populate('orderItems.product', 'name images')
+      .populate('orderItems.product', 'name images stock')
       .populate('orderItems.vendor', 'name email vendorInfo.businessName');
 
     if (!order) {
@@ -135,7 +295,7 @@ const getOrder = async (req, res) => {
     if (order.user._id.toString() !== req.user._id.toString() && 
         req.user.role !== 'admin' && 
         !order.orderItems.some(item => item.vendor._id.toString() === req.user._id.toString())) {
-      return res.status(403).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Not authorized to view this order' });
     }
 
     res.json({
@@ -226,6 +386,8 @@ module.exports = {
   createOrder,
   getMyOrders,
   getOrder,
+  updateOrder,
+  cancelOrder,
   updateOrderStatus,
   getAllOrders
 };
