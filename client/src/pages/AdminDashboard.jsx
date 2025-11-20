@@ -71,7 +71,7 @@ const AdminDashboard = () => {
       const vendors = allUsers.filter(u => u.role === 'vendor');
       const pendingVendors = vendors.filter(v => !v.vendorInfo?.isVerified);
 
-      const totalRevenue = (ordersRes.data.orders || []).reduce(
+      const totalRevenue = (ordersRes.data.orders || []).filter(order => order.status !== 'cancelled').reduce(
         (sum, order) => sum + (order.totalPrice || 0), 0
       );
 
@@ -104,7 +104,7 @@ const AdminDashboard = () => {
         return acc;
       }, {});
 
-      const revenueByMonth = orders.reduce((acc, order) => {
+      const revenueByMonth = orders.filter(order => order.status !== 'cancelled').reduce((acc, order) => {
         const month = new Date(order.createdAt).toLocaleString('default', { month: 'short' });
         acc[month] = (acc[month] || 0) + (order.totalPrice || 0);
         return acc;
@@ -827,7 +827,7 @@ const ReportsTab = ({ orders, products, users }) => (
         <h3 className="font-semibold mb-4">Sales Report</h3>
         <p className="text-gray-600">Total Orders: {orders.length}</p>
         <p className="text-gray-600">Total Revenue: {formatPricePKR(
-          orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+          orders.filter(order => order.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0)
         )}</p>
       </div>
       <div className="border rounded-lg p-6">
@@ -860,7 +860,9 @@ const AnalyticsTab = ({ analytics, stats }) => (
       </div>
       <div className="border rounded-lg p-6">
         <h3 className="font-semibold mb-4">Revenue Overview</h3>
-        <p className="text-2xl font-bold text-green-600">{formatPricePKR(stats.totalRevenue)}</p>
+        <p className="text-2xl font-bold text-green-600">{formatPricePKR(
+          orders.filter(order => order.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+        )}</p>
         <p className="text-sm text-gray-600 mt-2">Total Revenue</p>
       </div>
     </div>
