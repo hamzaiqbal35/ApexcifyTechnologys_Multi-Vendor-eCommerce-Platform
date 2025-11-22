@@ -142,7 +142,8 @@ const AdminDashboard = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await api.get('/products');
+      // Use admin endpoint to get ALL products (active and inactive)
+      const res = await api.get('/products/admin/all');
       setProducts(res.data.products || []);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -246,25 +247,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleToggleProductStatus = async (productId, isActive) => {
+  const handleToggleProductStatus = async (productId, currentStatus) => {
     try {
-      await api.put(`/products/${productId}`, { isActive: !isActive });
+      await api.put(`/products/${productId}`, { isActive: !currentStatus });
       fetchProducts();
+      alert(`Product has been ${currentStatus ? 'deactivated' : 'activated'} successfully`);
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to update product');
+      console.error('Error toggling product status:', error);
+      alert(error.response?.data?.message || 'Failed to update product status');
     }
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-    
-    try {
-      await api.delete(`/products/${productId}`);
-      alert('Product deleted successfully');
-      fetchProducts();
-      fetchStats();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to delete product');
+    if (window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      try {
+        await api.delete(`/products/${productId}`);
+        fetchProducts();
+        alert('Product deleted successfully');
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert(error.response?.data?.message || 'Failed to delete product');
+      }
     }
   };
 
