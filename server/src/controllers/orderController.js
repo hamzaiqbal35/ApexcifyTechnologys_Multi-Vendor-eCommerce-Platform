@@ -240,14 +240,20 @@ const cancelOrder = async (req, res) => {
     order.cancellationReason = reason;
     order.cancelledAt = new Date();
 
+    // RESET ALL STATUS FLAGS TO MAINTAIN CONSISTENCY
+    order.isShipped = false;
+    order.shippedAt = null;
+    order.isDelivered = false;
+    order.deliveredAt = null;
+
     // FORCE UNPAID ON CANCEL
     if (order.isPaid) {
       order.isRefunded = true;
       order.refundedAt = new Date();
     }
 
-    order.isPaid = false;       // <-- IMPORTANT
-    order.paidAt = null;        // <-- IMPORTANT
+    order.isPaid = false;
+    order.paidAt = null;
 
     await order.save();
 
@@ -288,6 +294,8 @@ const getOrder = async (req, res) => {
 };
 
 // @desc    Update order status
+// @route   PUT /api/orders/:id/status
+// @access  Private (admin/vendor)
 const updateOrderStatus = async (req, res) => {
   try {
     const { status, trackingNumber } = req.body;
@@ -295,6 +303,13 @@ const updateOrderStatus = async (req, res) => {
       .populate('user', 'email name');
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Check if order is cancelled
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ 
+        message: 'Cannot update status of cancelled orders' 
+      });
+    }
 
     const isVendor = order.orderItems.some(
       item => item.vendor.toString() === req.user._id.toString()
@@ -304,12 +319,56 @@ const updateOrderStatus = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
+    // Validate status transitions
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      });
+    }
+
+    // Update status
     order.status = status;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     
-    if (status === 'delivered') {
-      order.isDelivered = true;
-      order.deliveredAt = new Date();
+    // CRITICAL: Synchronize all status-related fields based on the main status
+    switch (status) {
+      case 'pending':
+        order.isShipped = false;
+        order.shippedAt = null;
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        break;
+        
+      case 'processing':
+        order.isShipped = false;
+        order.shippedAt = null;
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        break;
+        
+      case 'shipped':
+        order.isShipped = true;
+        if (!order.shippedAt) order.shippedAt = new Date();
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        break;
+        
+      case 'delivered':
+        order.isShipped = true;
+        if (!order.shippedAt) order.shippedAt = new Date();
+        order.isDelivered = true;
+        if (!order.deliveredAt) order.deliveredAt = new Date();
+        break;
+        
+      case 'cancelled':
+        // This should typically use the cancelOrder function instead
+        order.isShipped = false;
+        order.shippedAt = null;
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        order.cancelledAt = new Date();
+        break;
     }
 
     await order.save();
@@ -353,6 +412,9 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+// @desc    Toggle payment status
+// @route   PUT /api/orders/:id/pay
+// @access  Private (admin/vendor)
 const updateOrderPaymentToggle = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -361,9 +423,11 @@ const updateOrderPaymentToggle = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // ADD THIS CHECK
+    // Prevent payment status changes on cancelled orders
     if (order.status === 'cancelled') {
-      return res.status(400).json({ message: 'Cannot update payment status of cancelled orders' });
+      return res.status(400).json({ 
+        message: 'Cannot update payment status of cancelled orders' 
+      });
     }
 
     const isVendor = order.orderItems.some(
@@ -384,6 +448,73 @@ const updateOrderPaymentToggle = async (req, res) => {
   }
 };
 
+// @desc    Fix inconsistent order data (utility function for admins)
+// @route   PUT /api/orders/:id/fix-consistency
+// @access  Private (admin only)
+const fixOrderConsistency = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    // Fix inconsistencies based on the main status field
+    const originalStatus = { ...order.toObject() };
+    
+    switch (order.status) {
+      case 'pending':
+      case 'processing':
+        order.isShipped = false;
+        order.shippedAt = null;
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        break;
+        
+      case 'shipped':
+        order.isShipped = true;
+        if (!order.shippedAt) order.shippedAt = new Date();
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        break;
+        
+      case 'delivered':
+        order.isShipped = true;
+        if (!order.shippedAt) order.shippedAt = new Date();
+        order.isDelivered = true;
+        if (!order.deliveredAt) order.deliveredAt = new Date();
+        break;
+        
+      case 'cancelled':
+        order.isShipped = false;
+        order.shippedAt = null;
+        order.isDelivered = false;
+        order.deliveredAt = null;
+        order.isPaid = false;
+        order.paidAt = null;
+        if (!order.cancelledAt) order.cancelledAt = new Date();
+        break;
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order consistency fixed',
+      changes: {
+        before: originalStatus,
+        after: order
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -392,5 +523,6 @@ module.exports = {
   cancelOrder,
   updateOrderStatus,
   getAllOrders,
-  updateOrderPaymentToggle
+  updateOrderPaymentToggle,
+  fixOrderConsistency
 };

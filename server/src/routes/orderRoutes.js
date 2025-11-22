@@ -8,7 +8,8 @@ const {
   cancelOrder,
   updateOrderStatus,
   getAllOrders,
-  updateOrderPaymentToggle
+  updateOrderPaymentToggle,
+  fixOrderConsistency
 } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/auth');
 const { validateUpdateOrder, validateCancelOrder } = require('../middleware/orderValidation');
@@ -24,8 +25,9 @@ router.put('/:id', validateUpdateOrder, updateOrder);
 router.put('/:id/cancel', validateCancelOrder, cancelOrder);
 
 router.put('/:id/status', authorize('admin', 'vendor'), updateOrderStatus);
-
-// UPDATED: this replaces /pay fixed version
 router.put('/:id/pay', authorize('admin', 'vendor'), updateOrderPaymentToggle);
+
+// Admin utility route to fix inconsistent orders
+router.put('/:id/fix-consistency', authorize('admin'), fixOrderConsistency);
 
 module.exports = router;
