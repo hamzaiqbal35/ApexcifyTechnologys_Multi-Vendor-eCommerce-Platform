@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
@@ -118,62 +119,161 @@ const getMyOrders = async (req, res) => {
 
 // @desc    Update order (customer updates items before shipping)
 const updateOrder = async (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const session = isProduction ? await mongoose.startSession() : null;
+  
+  if (isProduction) {
+    session.startTransaction();
+  }
+  
   try {
     const { id } = req.params;
     const { orderItems } = req.body;
     const userId = req.user._id;
 
+    // Find the order with the current items
     const order = await Order.findById(id)
       .populate('orderItems.product')
       .populate('orderItems.vendor');
-    
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (!order) {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
     if (order.user.toString() !== userId.toString()) {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
       return res.status(403).json({ message: 'Not authorized to update this order' });
     }
 
     if (order.status !== 'pending') {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
       return res.status(400).json({ message: 'Can only edit pending orders' });
     }
 
     if (order.isPaid || order.isShipped) {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
       return res.status(400).json({ message: 'Cannot edit paid or shipped orders' });
     }
 
     if (!orderItems || orderItems.length === 0) {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
       return res.status(400).json({ message: 'Order must contain at least one item' });
     }
 
+    // Create a map of current order items for quick lookup
+    const currentItems = new Map();
+    order.orderItems.forEach(item => {
+      if (item.product && item.product._id) {
+        currentItems.set(item.product._id.toString(), {
+          quantity: item.quantity,
+          product: item.product
+        });
+      }
+    });
+
     let itemsPrice = 0;
     const updatedOrderItems = [];
+    const productUpdates = [];
 
+    // First pass: Calculate stock changes
     for (const item of orderItems) {
       const product = await Product.findById(item.product);
-      if (!product) return res.status(404).json({ message: `Product ${item.product} not found` });
+      if (!product) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
+        return res.status(404).json({ message: `Product ${item.product} not found` });
+      }
 
-      if (item.quantity > product.stock) {
+      const currentQty = currentItems.get(item.product)?.quantity || 0;
+      const newQty = item.quantity;
+
+      // Calculate the actual change in quantity
+      const quantityChange = newQty - currentQty;
+
+      // Verify stock is sufficient for ADDITIONS only
+      if (quantityChange > 0 && product.stock < quantityChange) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
         return res.status(400).json({
-          message: `Not enough stock for ${product.name}. Available: ${product.stock}`
+          message: `Not enough stock for ${product.name}. Available: ${product.stock}` 
         });
       }
 
-      if (item.quantity < 1) {
+      if (newQty < 1) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
         return res.status(400).json({ message: 'Item quantity must be at least 1' });
+      }
+
+      // Store the update - FIXED: No negation needed
+      if (quantityChange !== 0) {
+        productUpdates.push({
+          productId: product._id,
+          stockChange: -quantityChange, // Negative of quantity change (adding to order = reducing stock)
+          currentQty,
+          newQty
+        });
       }
 
       updatedOrderItems.push({
         name: product.name,
-        quantity: item.quantity,
-        image: product.image || product.images?.[0] || '',
+        quantity: newQty,
+        image: product.image || (product.images && product.images[0]) || '',
         price: product.price,
         product: product._id,
         vendor: product.vendor
       });
 
-      itemsPrice += product.price * item.quantity;
+      itemsPrice += product.price * newQty;
     }
 
+    // Handle items that were removed from the order (not in new orderItems)
+    for (const [productId, itemData] of currentItems.entries()) {
+      const stillInOrder = orderItems.some(item => item.product === productId);
+      if (!stillInOrder) {
+        // Item was removed entirely - restore stock
+        productUpdates.push({
+          productId: productId,
+          stockChange: itemData.quantity, // Return the quantity back to stock
+          currentQty: itemData.quantity,
+          newQty: 0
+        });
+      }
+    }
+
+    // Second pass: Apply stock updates
+    for (const update of productUpdates) {
+      const updateQuery = Product.findByIdAndUpdate(
+        update.productId,
+        { $inc: { stock: update.stockChange } },
+        isProduction ? { session } : {}
+      );
+      await updateQuery;
+    }
+
+    // Update order
     const taxPrice = itemsPrice * 0.1;
     const shippingPrice = order.shippingPrice;
     const totalPrice = itemsPrice + taxPrice + shippingPrice;
@@ -183,7 +283,13 @@ const updateOrder = async (req, res) => {
     order.taxPrice = taxPrice;
     order.totalPrice = totalPrice;
 
-    await order.save();
+    if (isProduction) {
+      await order.save({ session });
+      await session.commitTransaction();
+      session.endSession();
+    } else {
+      await order.save();
+    }
 
     res.json({
       success: true,
@@ -191,6 +297,10 @@ const updateOrder = async (req, res) => {
       order
     });
   } catch (error) {
+    if (isProduction && session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
     res.status(500).json({ message: error.message });
   }
 };
