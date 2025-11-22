@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import api from '../utils/api';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { formatPricePKR } from '../utils/currency';
-import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -873,50 +875,279 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange }) => {
 };
 
 // Categories Tab Component
-const CategoriesTab = ({ categories, onAdd, onDelete }) => {
-  const [newCategory, setNewCategory] = useState('');
+const CategoriesTab = () => {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newCategory, setNewCategory] = useState({ name: '', description: '' });
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onAdd(newCategory);
-    setNewCategory('');
+  // Fetch categories
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/categories?search=${searchTerm}`);
+      setCategories(res.data.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      alert('Failed to fetch categories');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Category Management</h2>
-      
-      <form onSubmit={handleSubmit} className="mb-6 flex space-x-2">
-        <input
-          type="text"
-          value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          placeholder="Add new category..."
-          className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <button
-          type="submit"
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Add Category
-        </button>
-      </form>
+  useEffect(() => {
+    fetchCategories();
+  }, [searchTerm]);
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {categories.map((category) => (
-          <div
-            key={category}
-            className="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition-shadow"
-          >
-            <span className="font-medium">{category}</span>
-            <button
-              onClick={() => onDelete(category)}
-              className="text-red-600 hover:text-red-800"
-            >
-              ✕
-            </button>
+  // Handle create category
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategory.name.trim()) return;
+    
+    try {
+      setIsSubmitting(true);
+      await api.post('/categories', newCategory);
+      setNewCategory({ name: '', description: '' });
+      fetchCategories();
+    } catch (error) {
+      console.error('Error creating category:', error);
+      alert(error.response?.data?.message || 'Failed to create category');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle update category
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCategory?.name?.trim()) return;
+    
+    try {
+      setIsSubmitting(true);
+      await api.put(`/categories/${editingCategory._id}`, {
+        name: editingCategory.name,
+        description: editingCategory.description,
+        isActive: editingCategory.isActive
+      });
+      setEditingCategory(null);
+      fetchCategories();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      alert(error.response?.data?.message || 'Failed to update category');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete category (hard delete if no products)
+  const handleDeleteCategory = async (categoryId) => {
+    if (!window.confirm('Are you sure you want to delete this category? This will permanently remove the category if there are no products in it. This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.delete(`/categories/${categoryId}`);
+      
+      if (response.data.success) {
+        // Show success message
+        alert(response.data.message || 'Category deleted successfully');
+        
+        // Refresh the categories list
+        await fetchCategories();
+      } else {
+        // Handle case where success is false but no error was thrown
+        alert(response.data.message || 'Failed to delete category');
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      
+      // More detailed error handling
+      const errorMessage = error.response?.data?.message || 
+                         (error.response?.status === 400 
+                           ? 'Cannot delete category with active products. Please deactivate or move the products first.'
+                           : 'Failed to delete category. Please try again.');
+      
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle category status
+  const toggleCategoryStatus = async (category) => {
+    try {
+      await api.put(`/categories/${category._id}`, {
+        isActive: !category.isActive
+      });
+      fetchCategories();
+    } catch (error) {
+      console.error('Error toggling category status:', error);
+      alert('Failed to update category status');
+    }
+  };
+
+  if (loading && categories.length === 0) {
+    return <div className="text-center py-8">Loading categories...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Category Management</h2>
+        <div className="w-64">
+          <input
+            type="text"
+            placeholder="Search categories..."
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Add/Edit Category Form */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold mb-4">
+          {editingCategory ? 'Edit Category' : 'Add New Category'}
+        </h3>
+        <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category Name *
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={editingCategory ? editingCategory.name : newCategory.name}
+                onChange={(e) => 
+                  editingCategory
+                    ? setEditingCategory({ ...editingCategory, name: e.target.value })
+                    : setNewCategory({ ...newCategory, name: e.target.value })
+                }
+                required
+                placeholder="Enter category name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={editingCategory ? editingCategory.description : newCategory.description}
+                onChange={(e) =>
+                  editingCategory
+                    ? setEditingCategory({ ...editingCategory, description: e.target.value })
+                    : setNewCategory({ ...newCategory, description: e.target.value })
+                }
+                placeholder="Enter description (optional)"
+              />
+            </div>
           </div>
-        ))}
+          
+          {editingCategory && (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={editingCategory.isActive}
+                onChange={(e) =>
+                  setEditingCategory({
+                    ...editingCategory,
+                    isActive: e.target.checked,
+                  })
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
+                Active
+              </label>
+            </div>
+          )}
+          
+          <div className="flex space-x-3 pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : editingCategory ? 'Update Category' : 'Add Category'}
+            </button>
+            {editingCategory && (
+              <button
+                type="button"
+                onClick={() => setEditingCategory(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Categories List */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="px-6 py-4 border-b">
+          <h3 className="text-lg font-semibold">All Categories</h3>
+        </div>
+        
+        {categories.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">
+            No categories found. Add a new category to get started.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {categories.map((category) => (
+              <div key={category._id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
+                <div>
+                  <div className="flex items-center">
+                    <span className={`font-medium ${!category.isActive ? 'text-gray-400' : 'text-gray-900'}`}>
+                      {category.name}
+                    </span>
+                    {!category.isActive && (
+                      <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  {category.description && (
+                    <p className="text-sm text-gray-500 mt-1">{category.description}</p>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => toggleCategoryStatus(category)}
+                    className={`px-3 py-1 text-sm rounded-md ${
+                      category.isActive
+                        ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    {category.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => setEditingCategory(category)}
+                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCategory(category._id)}
+                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -21,6 +21,24 @@ const VendorProductForm = () => {
   });
   const [imageUrl, setImageUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const res = await api.get('/categories');
+        setCategories(res.data.data || []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     if (isEdit) {
@@ -201,15 +219,28 @@ const VendorProductForm = () => {
 
           <div>
             <label className="block font-semibold mb-2">Category *</label>
-            <input
-              type="text"
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              required
-              placeholder="e.g., Electronics, Clothing"
-              className="w-full px-3 py-2 border rounded"
-            />
+            {loadingCategories ? (
+              <div className="w-full px-3 py-2 border rounded bg-gray-100 animate-pulse">
+                Loading categories...
+              </div>
+            ) : (
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="">Select a category</option>
+                {categories
+                  .filter(category => category.isActive)
+                  .map((category) => (
+                    <option key={category._id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
+            )}
           </div>
 
           {/* Image Upload Section */}
