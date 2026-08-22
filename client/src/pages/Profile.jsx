@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { toast } from 'react-toastify';
+import { Camera, Save, KeyRound, Loader2, X, Trash2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const FILE_BASE_URL = API_URL.replace(/\/api$/, '');
@@ -14,7 +15,7 @@ const getAvatarUrl = (avatar) => {
 };
 
 const Profile = () => {
-  const { user, isAuthenticated, updateUser } = useAuth();
+  const { user, isAuthenticated, updateUser, logout } = useAuth();
   const [formData, setFormData] = useState(() => ({
     name: user?.name || '',
     email: user?.email || '',
@@ -26,12 +27,6 @@ const Profile = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
   
-  // Password visibility states
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  // Password form states
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -39,17 +34,16 @@ const Profile = () => {
     confirmPassword: ''
   });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('New passwords do not match');
+      setStatusMessage({ type: 'error', text: 'New passwords do not match' });
       return;
     }
-
     if (passwordData.newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+      setStatusMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
       return;
     }
 
@@ -60,35 +54,20 @@ const Profile = () => {
         newPassword: passwordData.newPassword
       });
       
-      toast.success('Password updated successfully');
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setShowPasswordForm(false);
+      setStatusMessage({ type: 'success', text: 'Password updated successfully' });
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setShowPasswordForm(false), 2000);
       
-      // Update the token in localStorage if a new one is returned
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
       }
     } catch (error) {
-      console.error('Password update error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          'Failed to update password. Please try again.';
-      toast.error(errorMessage);
+      setStatusMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update password' });
     } finally {
       setIsUpdatingPassword(false);
     }
   };
 
-  // Keep local state in sync when user data (including avatar) changes
   useEffect(() => {
     if (!user) return;
     setFormData({
@@ -101,12 +80,7 @@ const Profile = () => {
   }, [user]);
 
   if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Profile</h1>
-        <p className="text-gray-600">Please log in to view your profile.</p>
-      </div>
-    );
+    return null;
   }
 
   const handleChange = (e) => {
@@ -128,7 +102,6 @@ const Profile = () => {
       setSaving(true);
       let latestUser;
 
-      // Update basic profile info (including email)
       const profileRes = await api.put('/users/me', {
         name: formData.name,
         phone: formData.phone,
@@ -136,19 +109,20 @@ const Profile = () => {
       });
       latestUser = profileRes.data.user;
 
-      // Upload avatar if selected
       if (avatarFile) {
         const formDataUpload = new FormData();
         formDataUpload.append('avatar', avatarFile);
-        const avatarRes = await api.put('/users/me/avatar', formDataUpload);
+        const avatarRes = await api.put('/users/me/avatar', formDataUpload, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         latestUser = avatarRes.data.user;
       }
 
       if (latestUser) {
         updateUser(latestUser);
-        setAvatarPreview(
-          latestUser.avatar ? getAvatarUrl(latestUser.avatar) : avatarPreview
-        );
+        setAvatarPreview(latestUser.avatar ? getAvatarUrl(latestUser.avatar) : avatarPreview);
         setFormData((prev) => ({
           ...prev,
           name: latestUser.name || prev.name,
@@ -157,268 +131,184 @@ const Profile = () => {
         }));
       }
 
-      toast.success('Profile updated successfully');
+      setStatusMessage({ type: 'success', text: 'Profile updated successfully' });
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+      setStatusMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update profile' });
     } finally {
       setSaving(false);
+      setTimeout(() => setStatusMessage({ type: '', text: '' }), 3000);
     }
   };
 
-  // Render password form with visibility toggles
-  const renderPasswordForm = () => (
-    <form onSubmit={handlePasswordChange} className="mt-6 space-y-4">
-      <div className="relative">
-        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
-          Current Password
-        </label>
-        <div className="relative">
-          <input
-            id="currentPassword"
-            type={showCurrentPassword ? "text" : "password"}
-            value={passwordData.currentPassword}
-            onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
-            required
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-            autoComplete="current-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-            tabIndex="-1"
-          >
-            {showCurrentPassword ? (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
+  const handleDeleteAccount = async () => {
+    const result = await Swal.fire({
+      title: 'Are you absolutely sure?',
+      text: 'This action cannot be undone. This will permanently delete your account and remove your data from our servers.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete my account'
+    });
 
-      <div className="mt-4">
-        <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-          New Password
-        </label>
-        <div className="relative">
-          <input
-            id="newPassword"
-            type={showNewPassword ? "text" : "password"}
-            value={passwordData.newPassword}
-            onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-            required
-            minLength={6}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-            autoComplete="new-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowNewPassword(!showNewPassword)}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-            tabIndex="-1"
-          >
-            {showNewPassword ? (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          Password must be at least 6 characters long
-        </p>
-      </div>
-
-      <div className="mt-4">
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-          Confirm New Password
-        </label>
-        <div className="relative">
-          <input
-            id="confirmPassword"
-            type={showConfirmPassword ? "text" : "password"}
-            value={passwordData.confirmPassword}
-            onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-            required
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-            autoComplete="new-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-            tabIndex="-1"
-          >
-            {showConfirmPassword ? (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-4 pt-4">
-        <button
-          type="button"
-          onClick={() => {
-            setShowPasswordForm(false);
-            setPasswordData({
-              currentPassword: '',
-              newPassword: '',
-              confirmPassword: ''
-            });
-          }}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          disabled={isUpdatingPassword}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          disabled={isUpdatingPassword}
-        >
-          {isUpdatingPassword ? 'Updating...' : 'Update Password'}
-        </button>
-      </div>
-    </form>
-  );
+    if (result.isConfirmed) {
+      try {
+        await api.delete('/users/me');
+        await Swal.fire('Deleted!', 'Your account has been deleted.', 'success');
+        logout();
+      } catch (error) {
+        Swal.fire('Error', error.response?.data?.message || 'Failed to delete account', 'error');
+      }
+    }
+  };
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto px-4 py-10 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-2">My Profile</h1>
-        <p className="text-gray-600 mb-8">
-          View and update your account information.
-        </p>
+      <div className="bg-gray-50 min-h-screen py-12 animate-fade-in">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-black mb-1">Account Settings</h1>
+              <p className="text-gray-500 text-sm">Manage your personal information and preferences.</p>
+            </div>
+          </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-6"
-            autoComplete="on"
-          >
-            <div className="flex items-center space-x-6">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-2xl font-semibold text-gray-500">
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    (user.name || 'U').charAt(0).toUpperCase()
-                  )}
+          {statusMessage.text && (
+            <div className={`mb-6 p-4 rounded-lg text-sm flex items-center justify-between ${statusMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+              <span>{statusMessage.text}</span>
+              <button onClick={() => setStatusMessage({ type: '', text: '' })}><X className="w-4 h-4" /></button>
+            </div>
+          )}
+
+          <div className="flex flex-col md:flex-row gap-8">
+            
+            <div className="md:w-1/3">
+              <div className="bg-white p-8 rounded-2xl border border-border shadow-sm text-center sticky top-24">
+                <div className="relative inline-block mb-6 group">
+                  <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 border border-border flex items-center justify-center text-4xl font-semibold text-gray-400">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      (user.name || 'U').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 w-10 h-10 bg-black text-white rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-gray-800 transition-colors opacity-0 group-hover:opacity-100">
+                    <Camera className="w-4 h-4" />
+                  </label>
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                </div>
+                <h2 className="text-xl font-bold text-black">{user?.name}</h2>
+                <p className="text-sm text-gray-500 mb-6">{user?.email}</p>
+                <div className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium uppercase tracking-wider rounded-full bg-gray-100 text-black">
+                  {user?.role} Account
                 </div>
               </div>
-              <div>
-                <label htmlFor="avatar-upload" className="block text-sm font-medium text-gray-700 mb-1">
-                  Profile Picture
-                </label>
-                <input
-                  id="avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  className="block text-sm text-gray-600"
-                  aria-describedby="avatar-upload-help"
-                />
-                <p id="avatar-upload-help" className="text-xs text-gray-500 mt-1">
-                  JPG, PNG up to 2MB.
-                </p>
+            </div>
+
+            <div className="md:w-2/3 space-y-8">
+              <div className="bg-white p-8 rounded-2xl border border-border shadow-sm">
+                <h3 className="text-lg font-bold text-black mb-6 border-b border-border pb-4">Personal Information</h3>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="profile-name" className="block text-sm font-medium text-black mb-2">Full Name</label>
+                      <input id="profile-name" type="text" name="name" value={formData.name} onChange={handleChange} className="input-field bg-gray-50" />
+                    </div>
+                    <div>
+                      <label htmlFor="profile-phone" className="block text-sm font-medium text-black mb-2">Phone Number</label>
+                      <input id="profile-phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} className="input-field bg-gray-50" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label htmlFor="profile-email" className="block text-sm font-medium text-black mb-2">Email Address</label>
+                      <input id="profile-email" type="email" name="email" value={formData.email} onChange={handleChange} className="input-field bg-gray-50" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end pt-4">
+                    <button type="submit" disabled={saving} className="btn-primary px-8 py-2.5 flex items-center shadow-sm">
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </div>
-            <div>
-              <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                id="profile-name"
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                autoComplete="name"
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
 
-            <div>
-              <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                id="profile-email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                autoComplete="email"
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+              <div className="bg-white p-8 rounded-2xl border border-border shadow-sm">
+                <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
+                  <h3 className="text-lg font-bold text-black flex items-center">
+                    <KeyRound className="w-5 h-5 mr-2 text-gray-400" /> Password & Security
+                  </h3>
+                  {!showPasswordForm && (
+                    <button onClick={() => setShowPasswordForm(true)} className="text-sm font-medium text-gray-500 hover:text-black underline-offset-4 hover:underline">
+                      Update Password
+                    </button>
+                  )}
+                </div>
 
-            <div>
-              <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
-              </label>
-              <input
-                id="profile-phone"
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                autoComplete="tel"
-                placeholder="Enter your phone number"
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+                {showPasswordForm ? (
+                  <form onSubmit={handlePasswordChange} className="space-y-6 animate-fade-in">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">Current Password</label>
+                      <input type="password" value={passwordData.currentPassword} onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})} required className="input-field bg-gray-50" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-2">New Password</label>
+                        <input type="password" value={passwordData.newPassword} onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})} required minLength={6} className="input-field bg-gray-50" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-2">Confirm New Password</label>
+                        <input type="password" value={passwordData.confirmPassword} onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})} required className="input-field bg-gray-50" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-4 pt-4">
+                      <button type="button" onClick={() => setShowPasswordForm(false)} className="px-6 py-2.5 text-sm font-medium text-gray-600 hover:text-black transition-colors" disabled={isUpdatingPassword}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="btn-primary px-8 py-2.5 flex items-center shadow-sm" disabled={isUpdatingPassword}>
+                        {isUpdatingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        {isUpdatingPassword ? 'Updating...' : 'Update Password'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Ensure your account is using a long, random password to stay secure.
+                  </p>
+                )}
+              </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-
-          {/* Change Password Section */}
-          <div className="mt-12 pt-8 border-t border-gray-200">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-xl font-semibold text-gray-800">Change Password</h2>
-              {!showPasswordForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordForm(true)}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 focus:outline-none"
-                >
-                  Change Password
-                </button>
+              {/* Danger Zone */}
+              {user?.role !== 'admin' && (
+                <div className="bg-red-50 p-8 rounded-2xl border border-red-100 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-bold text-red-700 flex items-center">
+                        <Trash2 className="w-5 h-5 mr-2" /> Delete Account
+                      </h3>
+                      <p className="text-sm text-red-600 mt-2 max-w-lg">
+                        Once you delete your account, there is no going back. Please be certain.
+                        Note: You cannot delete your account if you have active orders.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={handleDeleteAccount}
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
 
-            {showPasswordForm && renderPasswordForm()}
+            </div>
+            
           </div>
         </div>
       </div>

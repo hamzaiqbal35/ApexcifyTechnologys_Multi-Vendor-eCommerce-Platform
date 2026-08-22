@@ -8,7 +8,7 @@ const { sendPasswordResetEmail } = require('../services/emailService');
 // @access  Public
 const register = async (req, res) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, phone } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -21,7 +21,7 @@ const register = async (req, res) => {
       name,
       email,
       password,
-      role: role || 'customer',
+      role: 'customer',
       phone
     });
 
@@ -193,7 +193,7 @@ const updatePassword = async (req, res) => {
     }
 
     // Check current password
-    const isMatch = await user.matchPassword(currentPassword);
+    const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({ 
         success: false,

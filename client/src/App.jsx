@@ -17,8 +17,6 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
-import VendorDashboard from './pages/VendorDashboard';
-import VendorProductForm from './pages/VendorProductForm';
 import AdminDashboard from './pages/AdminDashboard';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -54,9 +52,6 @@ function App() {
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/orders/:id" element={<OrderDetails />} />
                 <Route path="/profile" element={<Profile />} />
-                <Route path="/vendor/dashboard" element={<VendorDashboard />} />
-                <Route path="/vendor/products/new" element={<VendorProductForm />} />
-                <Route path="/vendor/products/:id/edit" element={<VendorProductForm />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />

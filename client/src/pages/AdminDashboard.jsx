@@ -6,6 +6,12 @@ import api from '../utils/api';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { formatPricePKR } from '../utils/currency';
 import { format, subDays } from 'date-fns';
+import { 
+  LayoutDashboard, Users, Package, ShoppingCart, 
+  Tags, FileText, Image as ImageIcon, Trash2, Upload,
+  CheckCircle, XCircle, Edit, DollarSign, Settings as SettingsIcon
+} from 'lucide-react';
+import Swal from 'sweetalert2';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -18,8 +24,6 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
-    totalVendors: 0,
-    pendingVendors: 0,
     totalProducts: 0,
     totalOrders: 0,
     totalRevenue: 0,
@@ -27,7 +31,6 @@ const AdminDashboard = () => {
 
   // Data states
   const [users, setUsers] = useState([]);
-  const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -50,8 +53,6 @@ const AdminDashboard = () => {
           fetchStats(),
           fetchAnalytics()
         ]);
-      } else if (activeTab === 'vendors') {
-        await fetchVendors();
       } else if (activeTab === 'users') {
         await fetchUsers();
       } else if (activeTab === 'products') {
@@ -76,8 +77,6 @@ const AdminDashboard = () => {
       ]);
 
       const allUsers = usersRes.data.users || [];
-      const vendors = allUsers.filter(u => u.role === 'vendor');
-      const pendingVendors = vendors.filter(v => !v.vendorInfo?.isVerified);
 
       const totalRevenue = (ordersRes.data.orders || []).filter(order => order.status !== 'cancelled').reduce(
         (sum, order) => sum + (order.totalPrice || 0), 0
@@ -85,8 +84,6 @@ const AdminDashboard = () => {
 
       setStats({
         totalUsers: allUsers.length,
-        totalVendors: vendors.length,
-        pendingVendors: pendingVendors.length,
         totalProducts: (productsRes.data.products || []).length,
         totalOrders: (ordersRes.data.orders || []).length,
         totalRevenue,
@@ -135,15 +132,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchVendors = async () => {
-    try {
-      const res = await api.get('/users');
-      const allUsers = res.data.users || [];
-      setVendors(allUsers.filter(u => u.role === 'vendor'));
-    } catch (error) {
-    }
-  };
-
   const fetchProducts = async () => {
     try {
       // Use admin endpoint to get ALL products (active and inactive)
@@ -166,66 +154,6 @@ const AdminDashboard = () => {
     setCategories([
       'Electronics', 'Clothing', 'Books', 'Home & Garden', 'Sports', 'Toys', 'Beauty', 'Food'
     ]);
-  };
-
-  const handleApproveVendor = async (vendorId) => {
-    try {
-      await api.put(`/users/${vendorId}`, {
-        'vendorInfo.isVerified': true
-      });
-      toast.success('Vendor approved successfully!');
-      fetchVendors();
-      fetchStats();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to approve vendor');
-    }
-  };
-
-  const handleDenyVendor = async (vendorId) => {
-    if (window.confirm('Are you sure you want to deny this vendor?')) {
-      const confirmResult = window.confirm('This will deactivate the vendor. Are you sure?');
-      if (!confirmResult) return;
-
-      try {
-        await api.put(`/users/${vendorId}`, {
-          'vendorInfo.isVerified': false,
-          isActive: false
-        });
-        toast.success('Vendor denied successfully');
-        fetchVendors();
-        fetchStats();
-      } catch (error) {
-        toast.error(error.response?.data?.message || 'Failed to deny vendor');
-      }
-    }
-  };
-
-  const handleToggleVendorStatus = async (vendorId, isActive) => {
-    const action = isActive ? 'Deactivate' : 'Activate';
-    const confirmResult = window.confirm(`Are you sure you want to ${action.toLowerCase()} this vendor?`);
-    if (!confirmResult) return;
-
-    try {
-      await api.put(`/users/${vendorId}`, { isActive: !isActive });
-      toast.success(`Vendor ${action.toLowerCase()}d successfully!`);
-      fetchVendors();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update vendor status');
-    }
-  };
-
-  const handleDeleteVendor = async (vendorId) => {
-    const confirmResult = window.confirm('Are you sure you want to DELETE this vendor? This action is irreversible and cannot be undone.');
-    if (!confirmResult) return;
-
-    try {
-      await api.delete(`/users/${vendorId}`);
-      toast.success('Vendor deleted successfully');
-      fetchVendors();
-      fetchStats();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete vendor');
-    }
   };
 
   const handleToggleUserStatus = async (userId, isActive) => {
@@ -282,9 +210,13 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateOrderStatus = async (orderId, status) => {
+  const handleUpdateOrderStatus = async (orderId, status, shippingDetails = null) => {
     try {
-      await api.put(`/orders/${orderId}/status`, { status });
+      const payload = { status };
+      if (shippingDetails) {
+        Object.assign(payload, shippingDetails);
+      }
+      await api.put(`/orders/${orderId}/status`, payload);
       toast.success('Order status updated successfully');
       fetchOrders();
     } catch (error) {
@@ -320,29 +252,30 @@ const AdminDashboard = () => {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'vendors', label: 'Vendors', icon: '🏪', badge: stats.pendingVendors },
-    { id: 'users', label: 'Users', icon: '👥' },
-    { id: 'products', label: 'Products', icon: '📦' },
-    { id: 'orders', label: 'Orders', icon: '🛒' },
-    { id: 'categories', label: 'Categories', icon: '🏷️' },
-    { id: 'reports', label: 'Reports', icon: '📄' }
+    { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
+    { id: 'products', label: 'Products', icon: <Package className="w-5 h-5" /> },
+    { id: 'orders', label: 'Orders', icon: <ShoppingCart className="w-5 h-5" /> },
+    { id: 'categories', label: 'Categories', icon: <Tags className="w-5 h-5" /> },
+    { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
+    { id: 'banners', label: 'Banners', icon: <ImageIcon className="w-5 h-5" /> },
+    { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-5 h-5" /> }
   ];
 
   return (
     <ProtectedRoute requiredRole="admin">
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white shadow-sm border-b">
+      <div className="min-h-screen bg-background text-brand-black">
+        <div className="bg-brand-white shadow-sm border-b border-border">
           <div className="container mx-auto px-4 py-4">
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage your Business</p>
+            <h1 className="text-3xl font-bold text-brand-black">Admin Dashboard</h1>
+            <p className="text-brand-gray mt-1">Manage your Business</p>
           </div>
         </div>
 
         <div className="container mx-auto px-4 py-6">
           {/* Tabs */}
-          <div className="bg-white rounded-lg shadow-sm mb-6 overflow-hidden border border-gray-100">
-            <div className="flex p-1.5 bg-gray-50/50">
+          <div className="bg-brand-white rounded-lg shadow-sm mb-6 overflow-hidden border border-border">
+            <div className="flex p-1.5 bg-muted">
               <div className="flex space-x-2.5 overflow-x-auto pb-1 scrollbar-hide">
                 {tabs.map((tab) => (
                   <button
@@ -351,23 +284,18 @@ const AdminDashboard = () => {
                     className={`
                       relative px-4 py-2.5 rounded-md font-medium text-sm transition-all duration-200 flex-shrink-0
                       ${activeTab === tab.id
-                        ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
-                        : 'text-gray-600 hover:bg-white hover:text-blue-500 hover:shadow-sm'
+                        ? 'bg-brand-white text-brand-orange shadow-sm border border-border'
+                        : 'text-brand-gray hover:bg-brand-white hover:text-brand-orange hover:shadow-sm'
                       }
-                      focus:outline-none focus:ring-2 focus:ring-blue-200 focus:ring-offset-1
+                      focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:ring-offset-1
                     `}
                   >
                     <span className="flex items-center">
-                      <span className="mr-2">{tab.icon}</span>
+                      <span className="mr-2 text-current">{tab.icon}</span>
                       {tab.label}
-                      {tab.badge > 0 && (
-                        <span className="ml-2 bg-red-500 text-white text-xs font-semibold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                          {tab.badge}
-                        </span>
-                      )}
                     </span>
                     {activeTab === tab.id && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full mx-2"></span>
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange rounded-full mx-2"></span>
                     )}
                   </button>
                 ))}
@@ -379,23 +307,12 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             {loading ? (
               <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange"></div>
                 <p className="mt-4 text-gray-600">Loading...</p>
               </div>
             ) : (
               <>
                 {activeTab === 'overview' && <OverviewTab stats={stats} />}
-                {activeTab === 'vendors' && (
-                  <VendorsTab
-                    vendors={vendors}
-                    onApprove={handleApproveVendor}
-                    onDeny={handleDenyVendor}
-                    onToggleStatus={handleToggleVendorStatus}
-                    onDelete={handleDeleteVendor}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                  />
-                )}
                 {activeTab === 'users' && (
                   <UsersTab
                     users={users}
@@ -430,7 +347,15 @@ const AdminDashboard = () => {
                     onDelete={handleDeleteCategory}
                   />
                 )}
-                {activeTab === 'reports' && <ReportsTab orders={orders} products={products} users={users} />}
+                {activeTab === 'reports' && (
+                  <ReportsTab
+                    orders={orders}
+                    products={products}
+                    users={users}
+                  />
+                )}
+                {activeTab === 'banners' && <BannersTab />}
+                {activeTab === 'settings' && <SettingsTab />}
               </>
             )}
           </div>
@@ -443,39 +368,33 @@ const AdminDashboard = () => {
 // Overview Tab Component
 const OverviewTab = ({ stats }) => (
   <div>
-    <h2 className="text-2xl font-bold mb-6">Dashboard Overview</h2>
+    <h2 className="text-2xl font-bold mb-6 text-brand-black">Dashboard Overview</h2>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <StatCard
         title="Total Users"
         value={stats.totalUsers}
-        icon="👥"
-        color="blue"
+        icon={<Users className="w-6 h-6" />}
+        color="black"
         change=""
       />
-      <StatCard
-        title="Total Vendors"
-        value={stats.totalVendors}
-        icon="🏪"
-        color="green"
-        badge={stats.pendingVendors > 0 ? `${stats.pendingVendors} pending` : null}
-      />
+
       <StatCard
         title="Total Products"
         value={stats.totalProducts}
-        icon="📦"
-        color="purple"
+        icon={<Package className="w-6 h-6" />}
+        color="darkGray"
       />
       <StatCard
         title="Total Orders"
         value={stats.totalOrders}
-        icon="🛒"
-        color="orange"
+        icon={<ShoppingCart className="w-6 h-6" />}
+        color="gray"
       />
       <StatCard
         title="Total Revenue"
         value={formatPricePKR(stats.totalRevenue)}
-        icon="💰"
-        color="green"
+        icon={<DollarSign className="w-6 h-6" />}
+        color="orange"
       />
     </div>
   </div>
@@ -483,190 +402,33 @@ const OverviewTab = ({ stats }) => (
 
 const StatCard = ({ title, value, icon, color, change, badge }) => {
   const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-    orange: 'bg-orange-100 text-orange-600',
+    orange: 'bg-brand-orange/10 text-brand-orange',
+    black: 'bg-brand-black/10 text-brand-black',
+    darkGray: 'bg-brand-dark-gray/10 text-brand-dark-gray',
+    gray: 'bg-brand-gray/10 text-brand-gray',
     red: 'bg-red-100 text-red-600'
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+    <div className="bg-brand-white border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-600 text-sm mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
+          <p className="text-brand-gray text-sm mb-1">{title}</p>
+          <p className="text-3xl font-bold text-brand-black">{value}</p>
           {change && <p className="text-sm text-green-600 mt-1">{change}</p>}
         </div>
-        <div className={`w-12 h-12 rounded-full ${colorClasses[color]} flex items-center justify-center text-2xl`}>
+        <div className={`w-12 h-12 rounded-full ${colorClasses[color]} flex items-center justify-center`}>
           {icon}
         </div>
       </div>
       {badge && (
-        <div className="mt-3 pt-3 border-t">
-          <span className="text-xs text-orange-600 font-medium">{badge}</span>
+        <div className="mt-3 pt-3 border-t border-border">
+          <span className="text-xs text-brand-orange font-medium">{badge}</span>
         </div>
       )}
     </div>
   );
 };
-
-// Vendors Tab Component
-const VendorsTab = ({ vendors, onApprove, onDeny, onToggleStatus, onDelete, searchTerm, onSearchChange }) => {
-  const filteredVendors = vendors.filter(v =>
-    v.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.vendorInfo?.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const pendingVendors = filteredVendors.filter(v => !v.vendorInfo?.isVerified);
-  const approvedVendors = filteredVendors.filter(v => v.vendorInfo?.isVerified);
-
-  return (
-    <div>
-      {/* Search bar remains the same */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Vendor Management</h2>
-        <div className="relative">
-          <label htmlFor="vendor-search" className="sr-only">Search vendors</label>
-          <input
-            id="vendor-search"
-            name="vendorSearch"
-            type="search"
-            placeholder="Search vendors..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            aria-label="Search vendors"
-          />
-        </div>
-      </div>
-
-      {/* Pending Vendors Section */}
-      {pendingVendors.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-orange-600">
-            Pending Approval ({pendingVendors.length})
-          </h3>
-          <div className="space-y-4">
-            {pendingVendors.map((vendor) => (
-              <VendorCard
-                key={vendor._id}
-                vendor={vendor}
-                onApprove={() => onApprove(vendor._id)}
-                onDeny={() => onDeny(vendor._id)}
-                isPending={true}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Approved Vendors Section */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">All Vendors ({approvedVendors.length})</h3>
-        {approvedVendors.length > 0 ? (
-          <div className="space-y-4">
-            {approvedVendors.map((vendor) => (
-              <VendorCard
-                key={vendor._id}
-                vendor={vendor}
-                onToggleStatus={() => onToggleStatus(vendor._id, vendor.isActive)}
-                onDelete={() => onDelete(vendor._id)}
-                isPending={false}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500">No approved vendors found</p>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const VendorCard = ({ vendor, onApprove, onDeny, isPending, onToggleStatus, onDelete }) => (
-  <div className={`border rounded-lg p-4 ${isPending ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
-    <div className="flex justify-between items-start">
-      {/* Vendor info display remains the same */}
-      <div className="flex-1">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
-            {vendor.avatar ? (
-              <img
-                src={vendor.avatar}
-                alt={vendor.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              vendor.name?.charAt(0).toUpperCase()
-            )}
-          </div>
-          <div>
-            <h4 className="font-semibold text-lg">{vendor.name}</h4>
-            <p className="text-sm text-gray-600">{vendor.email}</p>
-            {vendor.vendorInfo?.businessName && (
-              <p className="text-sm text-gray-700 mt-1">
-                <strong>Business:</strong> {vendor.vendorInfo.businessName}
-              </p>
-            )}
-          </div>
-        </div>
-        {vendor.vendorInfo?.businessDescription && (
-          <p className="text-sm text-gray-600 mt-3">{vendor.vendorInfo.businessDescription}</p>
-        )}
-        <div className="flex items-center space-x-4 mt-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${vendor.vendorInfo?.isVerified
-            ? 'bg-green-100 text-green-800'
-            : 'bg-orange-100 text-orange-800'
-            }`}>
-            {vendor.vendorInfo?.isVerified ? 'Verified' : 'Pending Verification'}
-          </span>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${vendor.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
-            {vendor.isActive ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col space-y-2 ml-4">
-        {isPending ? (
-          <>
-            <button
-              onClick={onApprove}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors w-full text-sm"
-            >
-              Approve
-            </button>
-            <button
-              onClick={onDeny}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors w-full text-sm"
-            >
-              Deny
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={onToggleStatus}
-              className={`px-4 py-2 rounded-lg text-white transition-colors w-full text-sm ${vendor.isActive ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`
-              }
-            >
-              {vendor.isActive ? 'Deactivate' : 'Activate'}
-            </button>
-            <button
-              onClick={onDelete}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors w-full text-sm"
-            >
-              Delete
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  </div>
-);
 
 // Users Tab Component
 const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange }) => {
@@ -688,7 +450,7 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
             placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search users"
           />
         </div>
@@ -710,7 +472,7 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
               <tr key={user._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold mr-3 overflow-hidden">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-orange to-brand-black rounded-full flex items-center justify-center text-white font-semibold mr-3 overflow-hidden">
                       {user.avatar ? (
                         <img
                           src={user.avatar}
@@ -731,7 +493,7 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-brand-orange/10 text-brand-orange capitalize">
                     {user.role}
                   </span>
                 </td>
@@ -793,7 +555,7 @@ const ProductsTab = ({ products, onToggleStatus, onDelete, searchTerm, onSearchC
             placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search products"
           />
         </div>
@@ -812,7 +574,7 @@ const ProductsTab = ({ products, onToggleStatus, onDelete, searchTerm, onSearchC
                 <h4 className="font-semibold text-lg">{product.name}</h4>
                 <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
                 <div className="flex items-center space-x-4 mt-2">
-                  <span className="text-blue-600 font-bold">{formatPricePKR(product.price)}</span>
+                  <span className="text-brand-orange font-bold">{formatPricePKR(product.price)}</span>
                   <span className="text-sm text-gray-600">Stock: {product.stock}</span>
                   <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
                     {product.category}
@@ -850,10 +612,43 @@ const ProductsTab = ({ products, onToggleStatus, onDelete, searchTerm, onSearchC
 
 // Orders Tab Component
 const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onTogglePayment }) => {
+  const [shippingModal, setShippingModal] = useState({ isOpen: false, orderId: null });
+  const [shippingData, setShippingData] = useState({ trackingNumber: '', courier: '', estimatedDeliveryDate: '' });
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, orderId: null });
+  const [cancelReason, setCancelReason] = useState('');
+
   const filteredOrders = orders.filter(o =>
     o._id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleStatusChange = (orderId, newStatus) => {
+    if (newStatus === 'shipped') {
+      setShippingModal({ isOpen: true, orderId });
+      setShippingData({ trackingNumber: '', courier: '', estimatedDeliveryDate: '' });
+    } else if (newStatus === 'cancelled') {
+      setCancelModal({ isOpen: true, orderId });
+      setCancelReason('');
+    } else {
+      onUpdateStatus(orderId, newStatus);
+    }
+  };
+
+  const handleShippingSubmit = (e) => {
+    e.preventDefault();
+    onUpdateStatus(shippingModal.orderId, 'shipped', shippingData);
+    setShippingModal({ isOpen: false, orderId: null });
+  };
+
+  const handleCancelSubmit = (e) => {
+    e.preventDefault();
+    if (cancelReason.trim().length < 5) {
+      alert('Reason must be at least 5 characters');
+      return;
+    }
+    onUpdateStatus(cancelModal.orderId, 'cancelled', { reason: cancelReason });
+    setCancelModal({ isOpen: false, orderId: null });
+  };
 
   return (
     <div>
@@ -868,48 +663,75 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
             placeholder="Search orders..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search orders"
           />
         </div>
       </div>
+
+      {shippingModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4">Enter Shipping Details</h3>
+            <form onSubmit={handleShippingSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Courier Name</label>
+                <input type="text" placeholder="e.g. TCS, Leopard" required className="w-full p-2 border rounded" value={shippingData.courier} onChange={(e) => setShippingData({...shippingData, courier: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tracking Number</label>
+                <input type="text" placeholder="Tracking Number" required className="w-full p-2 border rounded" value={shippingData.trackingNumber} onChange={(e) => setShippingData({...shippingData, trackingNumber: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Estimated Delivery Date</label>
+                <input type="date" required className="w-full p-2 border rounded" value={shippingData.estimatedDeliveryDate} onChange={(e) => setShippingData({...shippingData, estimatedDeliveryDate: e.target.value})} />
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => setShippingModal({ isOpen: false, orderId: null })} className="px-4 py-2 text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-brand-orange text-white rounded">Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {cancelModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-red-600 mb-4">Cancel Order</h3>
+            <form onSubmit={handleCancelSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Cancellation Reason</label>
+                <textarea 
+                  required 
+                  minLength={5}
+                  placeholder="Provide a reason..." 
+                  className="w-full p-2 border rounded resize-none h-24" 
+                  value={cancelReason} 
+                  onChange={(e) => setCancelReason(e.target.value)} 
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => setCancelModal({ isOpen: false, orderId: null })} className="px-4 py-2 text-gray-600">Back</button>
+                <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Confirm Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {filteredOrders.map((order) => (
           <div key={order._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
               <div>
-                {/* Make order id clickable to go to order details */}
-                <Link to={`/orders/${order._id}`} className="font-semibold text-blue-600 hover:underline">
+                <Link to={`/orders/${order._id}`} className="font-semibold text-brand-orange hover:underline">
                   Order #{order._id.slice(-8)}
                 </Link>
                 <p className="text-sm text-gray-600">
                   {order.user?.name} - {new Date(order.createdAt).toLocaleDateString()}
                 </p>
                 <p className="text-sm text-gray-600">Total: {formatPricePKR(order.totalPrice)}</p>
-
-                {/* Vendor Cancellation Request Alert */}
-                {order.vendorCancelRequested && order.status !== 'cancelled' && (
-                  <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
-                    <div className="flex items-start">
-                      <span className="text-red-500 mr-2">⚠️</span>
-                      <div>
-                        <p className="text-sm font-bold text-red-800">Cancellation Requested by Vendor</p>
-                        <p className="text-sm text-red-700 mt-1">Reason: {order.vendorCancelReason}</p>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Approve cancellation for this order?')) {
-                              onUpdateStatus(order._id, 'cancelled');
-                            }
-                          }}
-                          className="mt-2 text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                        >
-                          Approve Cancellation
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Shipping Info Display */}
                 {order.status === 'shipped' && order.trackingNumber && (
@@ -919,13 +741,27 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
                     <p><span className="font-semibold">Est. Delivery:</span> {new Date(order.estimatedDeliveryDate).toLocaleDateString()}</p>
                   </div>
                 )}
+                
+                {/* Cancel Info Display */}
+                {order.status === 'cancelled' && order.cancellationReason && (
+                  <div className="mt-2 text-sm bg-red-50 text-red-800 p-2 rounded border border-red-100">
+                    <p><span className="font-semibold">Reason:</span> {order.cancellationReason}</p>
+                  </div>
+                )}
+
+                {/* Return Info Display */}
+                {['return_requested', 'returned'].includes(order.status) && order.returnReason && (
+                  <div className="mt-2 text-sm bg-amber-50 text-amber-800 p-2 rounded border border-amber-100">
+                    <p><span className="font-semibold">Return Reason:</span> {order.returnReason}</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col items-end space-y-2">
                 <div className="flex items-center space-x-3">
                   <select
                     value={order.status}
-                    onChange={(e) => onUpdateStatus(order._id, e.target.value)}
+                    onChange={(e) => handleStatusChange(order._id, e.target.value)}
                     className="px-3 py-1 border rounded-lg text-sm"
                   >
                     <option value="pending">Pending</option>
@@ -933,10 +769,14 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
                     <option value="processing">Processing</option>
                     <option value="shipped">Shipped</option>
                     <option value="delivered">Delivered</option>
+                    <option value="return_requested" disabled>Return Requested</option>
+                    <option value="returned">Returned (Refund & Restock)</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
                     order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                    order.status === 'returned' ? 'bg-gray-100 text-gray-800' :
+                    order.status === 'return_requested' ? 'bg-amber-100 text-amber-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
                     {order.status}
@@ -1106,7 +946,7 @@ const CategoriesTab = () => {
             placeholder="Search categories..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search categories"
           />
         </div>
@@ -1130,7 +970,7 @@ const CategoriesTab = () => {
                 id="category-name"
                 name="categoryName"
                 type="text"
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-orange/50"
                 value={editingCategory ? editingCategory.name : newCategory.name}
                 onChange={(e) =>
                   editingCategory
@@ -1153,7 +993,7 @@ const CategoriesTab = () => {
                 id="category-description"
                 name="categoryDescription"
                 type="text"
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-orange/50"
                 value={editingCategory ? editingCategory.description : newCategory.description}
                 onChange={(e) =>
                   editingCategory
@@ -1179,7 +1019,7 @@ const CategoriesTab = () => {
                     isActive: e.target.checked,
                   })
                 }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-brand-orange focus:ring-brand-orange/50 border-gray-300 rounded accent-brand-orange"
                 aria-label="Category active status"
               />
               <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
@@ -1192,7 +1032,7 @@ const CategoriesTab = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              className="px-4 py-2 bg-brand-orange text-white rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-2 disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : editingCategory ? 'Update Category' : 'Add Category'}
             </button>
@@ -1200,7 +1040,7 @@ const CategoriesTab = () => {
               <button
                 type="button"
                 onClick={() => setEditingCategory(null)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-2"
               >
                 Cancel
               </button>
@@ -1250,7 +1090,7 @@ const CategoriesTab = () => {
                   </button>
                   <button
                     onClick={() => setEditingCategory(category)}
-                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
+                    className="px-3 py-1 text-sm text-brand-orange hover:bg-brand-orange/10 rounded-md"
                   >
                     Edit
                   </button>
@@ -1430,7 +1270,7 @@ const ReportsTab = ({ orders, products, users }) => {
           </div>
           <button
             onClick={exportToCSV}
-            className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm"
+            className="bg-brand-orange text-white px-4 py-1 rounded hover:opacity-90 text-sm"
           >
             Export CSV
           </button>
@@ -1439,7 +1279,7 @@ const ReportsTab = ({ orders, products, users }) => {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-orange"></div>
         </div>
       ) : (
         <>
@@ -1469,13 +1309,13 @@ const ReportsTab = ({ orders, products, users }) => {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex border-b mb-4">
               <button
-                className={`px-4 py-2 font-medium ${activeChart === 'sales' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+                className={`px-4 py-2 font-medium ${activeChart === 'sales' ? 'border-b-2 border-brand-orange text-brand-orange' : 'text-gray-500'}`}
                 onClick={() => setActiveChart('sales')}
               >
                 Sales Trend
               </button>
               <button
-                className={`px-4 py-2 font-medium ${activeChart === 'products' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+                className={`px-4 py-2 font-medium ${activeChart === 'products' ? 'border-b-2 border-brand-orange text-brand-orange' : 'text-gray-500'}`}
                 onClick={() => setActiveChart('products')}
               >
                 Top Products
@@ -1505,7 +1345,7 @@ const ReportsTab = ({ orders, products, users }) => {
                           type="monotone"
                           dataKey="sales"
                           name="Sales"
-                          stroke="#3b82f6"
+                          stroke="#E85002"
                           strokeWidth={2}
                           dot={false}
                         />
@@ -1524,7 +1364,7 @@ const ReportsTab = ({ orders, products, users }) => {
                   <h3 className="text-lg font-medium mb-4">Top Selling Products</h3>
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-orange"></div>
                     </div>
                   ) : topProducts && topProducts.length > 0 ? (
                     <div className="h-64">
@@ -1592,7 +1432,7 @@ const ReportsTab = ({ orders, products, users }) => {
                                   })}</span>
                                 </div>
                                 <div className="flex items-center">
-                                  <span className="inline-block w-3 h-3 mr-2 bg-blue-500 rounded-full"></span>
+                                  <span className="inline-block w-3 h-3 mr-2 bg-brand-orange rounded-full"></span>
                                   <span>Quantity Sold: {Math.round(Number(data.quantitySold || 0))}</span>
                                 </div>
                                 <div className="flex items-center">
@@ -1614,7 +1454,7 @@ const ReportsTab = ({ orders, products, users }) => {
                             } else if (value === 'Total Sales (PKR)') {
                               color = '#8b5cf6';
                             } else {
-                              color = '#3b82f6';
+                              color = '#E85002';
                             }
                             return <span style={{ color }}>{value}</span>;
                           }}
@@ -1635,11 +1475,11 @@ const ReportsTab = ({ orders, products, users }) => {
                           radius={[0, 4, 4, 0]}
                           barSize={20}
                         />
-                        {/* Quantity Sold Bar (Blue) */}
+                        {/* Quantity Sold Bar (Orange) */}
                         <Bar
                           dataKey="quantitySold"
                           name="Quantity Sold"
-                          fill="#3b82f6"
+                          fill="#E85002"
                           radius={[0, 4, 4, 0]}
                           barSize={20}
                         />
@@ -1723,7 +1563,7 @@ const ReportsTab = ({ orders, products, users }) => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                               ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
+                                order.status === 'shipped' ? 'bg-brand-orange/10 text-brand-orange' :
                                   order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
                                     'bg-gray-100 text-gray-800'}`}>
                               {order.status}
@@ -1748,6 +1588,332 @@ const ReportsTab = ({ orders, products, users }) => {
     </div>
   );
 };
+// Banners Tab Component
+const BannersTab = () => {
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({ title: '', subtitle: '', link: '', order: 0, isActive: true, textColor: '#000000' });
+  const [editingBannerId, setEditingBannerId] = useState(null);
+  const [image, setImage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchBanners = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/banners/admin');
+      setBanners(res.data.banners || []);
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+      toast.error('Failed to load banners');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!image && !editingBannerId) {
+      toast.warning('Please select an image');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const data = new FormData();
+      data.append('title', formData.title);
+      data.append('subtitle', formData.subtitle);
+      data.append('link', formData.link);
+      data.append('order', formData.order);
+      data.append('isActive', formData.isActive);
+      data.append('textColor', formData.textColor);
+      if (image) {
+        data.append('image', image);
+      }
+
+      if (editingBannerId) {
+        await api.put(`/banners/${editingBannerId}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        toast.success('Banner updated successfully');
+      } else {
+        await api.post('/banners', data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        toast.success('Banner created successfully');
+      }
+      
+      handleCancelEdit();
+      fetchBanners();
+    } catch (error) {
+      console.error('Error saving banner:', error);
+      toast.error(editingBannerId ? 'Failed to update banner' : 'Failed to create banner');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditClick = (banner) => {
+    setEditingBannerId(banner._id);
+    setFormData({
+      title: banner.title || '',
+      subtitle: banner.subtitle || '',
+      link: banner.link || '',
+      order: banner.order || 0,
+      isActive: banner.isActive,
+      textColor: banner.textColor || '#000000'
+    });
+    setImage(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBannerId(null);
+    setFormData({ title: '', subtitle: '', link: '', order: 0, isActive: true, textColor: '#000000' });
+    setImage(null);
+  };
+
+  const handleDelete = async (id) => {
+    if (!(await Swal.fire({ text: 'Are you sure you want to delete this banner?', showCancelButton: true, confirmButtonColor: '#000', customClass: { confirmButton: 'btn-primary', cancelButton: 'btn-secondary' }, buttonsStyling: false })).isConfirmed) return;
+    try {
+      await api.delete(`/banners/${id}`);
+      toast.success('Banner deleted');
+      fetchBanners();
+    } catch (error) {
+      toast.error('Failed to delete banner');
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Hero Banners Management</h2>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg shadow-sm border border-border p-6">
+        <h3 className="text-lg font-semibold mb-4">{editingBannerId ? 'Edit Banner' : 'Add New Banner'}</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Title</label>
+              <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="input-field bg-white" placeholder="Summer Sale" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Subtitle</label>
+              <input type="text" value={formData.subtitle} onChange={e => setFormData({...formData, subtitle: e.target.value})} className="input-field bg-white" placeholder="Up to 50% off" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Link URL</label>
+              <input type="text" value={formData.link} onChange={e => setFormData({...formData, link: e.target.value})} className="input-field bg-white" placeholder="/products?category=summer" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Display Order</label>
+              <input type="number" value={formData.order} onChange={e => setFormData({...formData, order: e.target.value})} className="input-field bg-white" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Text Color</label>
+              <div className="flex items-center space-x-2">
+                <input type="color" value={formData.textColor} onChange={e => setFormData({...formData, textColor: e.target.value})} className="h-10 w-16 p-1 bg-white border border-border rounded cursor-pointer" />
+                <span className="text-sm text-gray-500">{formData.textColor}</span>
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-black mb-1">Banner Image {editingBannerId && '(Leave blank to keep current)'}</label>
+              <input type="file" accept="image/*" onChange={e => setImage(e.target.files[0])} className="input-field bg-white p-2" required={!editingBannerId} />
+            </div>
+            <div className="md:col-span-2 flex items-center">
+              <input type="checkbox" id="isActive" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})} className="mr-2" />
+              <label htmlFor="isActive" className="text-sm">Active</label>
+            </div>
+          </div>
+          <div className="flex space-x-3 mt-4">
+            <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center">
+              {isSubmitting ? 'Saving...' : <><Upload className="w-4 h-4 mr-2" /> {editingBannerId ? 'Update Banner' : 'Upload Banner'}</>}
+            </button>
+            {editingBannerId && (
+              <button type="button" onClick={handleCancelEdit} className="btn-secondary">
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <p>Loading banners...</p>
+        ) : banners.length === 0 ? (
+          <p className="text-gray-500 col-span-full">No banners found. Upload one above to display on the home page.</p>
+        ) : (
+          banners.map(banner => (
+            <div key={banner._id} className="border border-border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow relative group">
+              <div className="h-40 bg-gray-100 w-full overflow-hidden relative">
+                <img src={`${import.meta.env.VITE_SERVER_URL}${banner.imageUrl}`} alt={banner.title} className="w-full h-full object-cover" onError={(e) => e.target.src='https://via.placeholder.com/600x400'} />
+                {!banner.isActive && <div className="absolute top-2 right-2 bg-black text-white text-xs px-2 py-1 rounded">Inactive</div>}
+              </div>
+              <div className="p-4">
+                <h4 className="font-bold text-lg mb-1 truncate">{banner.title}</h4>
+                <p className="text-sm text-gray-500 mb-3 truncate">{banner.subtitle}</p>
+                <div className="flex space-x-3 mt-2">
+                  <button onClick={() => handleEditClick(banner)} className="text-brand-orange hover:opacity-80 text-sm flex items-center">
+                    <Edit className="w-4 h-4 mr-1" /> Edit
+                  </button>
+                  <button onClick={() => handleDelete(banner._id)} className="text-red-600 hover:text-red-800 text-sm flex items-center">
+                    <Trash2 className="w-4 h-4 mr-1" /> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
 
 
 export default AdminDashboard;
+
+const SettingsTab = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    shipping: { isTiered: true, flatRate: 200, freeShippingThreshold: 5000 },
+    tax: { rate: 10 }
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data.data) {
+          setSettings({
+            shipping: res.data.data.shipping || { isTiered: true, flatRate: 200, freeShippingThreshold: 5000 },
+            tax: res.data.data.tax || { rate: 10 }
+          });
+        }
+      } catch (error) {
+        toast.error('Failed to load settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked, dataset } = e.target;
+    const category = dataset.category || 'shipping';
+    
+    setSettings((prev) => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [name]: type === 'checkbox' ? checked : Number(value)
+      }
+    }));
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.put('/settings', settings);
+      toast.success('Settings updated successfully');
+    } catch (error) {
+      toast.error('Failed to update settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div>Loading settings...</div>;
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="text-2xl font-bold mb-6">Store Settings</h2>
+      <div className="bg-white border rounded-lg p-6">
+        <h3 className="text-lg font-semibold mb-4 border-b pb-2">Shipping Configuration</h3>
+        <form onSubmit={handleSave} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  name="isTiered"
+                  data-category="shipping"
+                  checked={settings.shipping.isTiered}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-brand-orange focus:ring-brand-orange border-gray-300 rounded"
+                />
+                <span className="font-medium">Enable Tiered Shipping (Free above threshold)</span>
+              </label>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Flat Rate Shipping Cost (PKR)</label>
+              <input 
+                type="number"
+                name="flatRate"
+                data-category="shipping"
+                min="0"
+                value={settings.shipping.flatRate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+              />
+            </div>
+
+            {settings.shipping.isTiered && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Free Shipping Threshold (PKR)</label>
+                <input 
+                  type="number"
+                  name="freeShippingThreshold"
+                  data-category="shipping"
+                  min="0"
+                  value={settings.shipping.freeShippingThreshold}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+                />
+                <p className="text-xs text-gray-500 mt-1">Orders with total price above this amount will have free shipping.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t">
+            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Tax Configuration</h3>
+            <div>
+              <label className="block text-sm font-medium mb-1">Tax Rate (%)</label>
+              <input 
+                type="number"
+                name="rate"
+                data-category="tax"
+                min="0"
+                max="100"
+                step="0.1"
+                value={settings.tax.rate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+              />
+              <p className="text-xs text-gray-500 mt-1">Example: Enter 10 for 10% tax.</p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <button 
+              type="submit" 
+              disabled={saving}
+              className="px-6 py-2 bg-brand-orange text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+

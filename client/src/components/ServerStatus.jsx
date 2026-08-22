@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../utils/api';
+import { AlertCircle } from 'lucide-react';
 
 const ServerStatus = () => {
   const [serverOnline, setServerOnline] = useState(true);
@@ -14,20 +15,20 @@ const ServerStatus = () => {
       }
     };
     checkServer();
-    const interval = setInterval(checkServer, 30000); // Check every 30 seconds
+    const interval = setInterval(checkServer, 30000);
     return () => clearInterval(interval);
   }, []);
 
   if (serverOnline) return null;
 
   return (
-    <div className="bg-yellow-500 text-white px-4 py-2 text-center">
-      <p className="font-semibold">
-        ⚠️ Backend server is not running. Please start the server with: <code className="bg-yellow-600 px-2 py-1 rounded">cd server && npm run dev</code>
-      </p>
+    <div className="bg-black text-white px-4 py-3 flex items-center justify-center text-sm">
+      <AlertCircle className="w-4 h-4 mr-2" />
+      <span>
+        We are currently experiencing high traffic or undergoing maintenance. Please try again later.
+      </span>
     </div>
   );
 };
 
 export default ServerStatus;
-

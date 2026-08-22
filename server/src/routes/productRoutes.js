@@ -11,7 +11,6 @@ const {
   uploadImages
 } = require('../controllers/productController');
 const { protect, authorize } = require('../middleware/auth');
-const { isVerifiedVendor } = require('../middleware/isVerifiedVendor');
 const { uploadProductImages } = require('../middleware/upload');
 
 // Admin route - Get all products (including inactive)
@@ -22,21 +21,19 @@ router.get('/admin/all', protect, authorize('admin'), getAllProductsAdmin);
 router.get('/', getProducts);
 router.get('/:id', getProduct);
 
-// Vendor-only: Create product
+// Admin-only: Create product
 router.post(
   '/',
   protect,
-  authorize('vendor'),
-  isVerifiedVendor,
+  authorize('admin'),
   createProduct
 );
 
-// Product image upload (vendor only)
+// Product image upload (admin only)
 router.post(
   '/upload-images',
   protect,
-  authorize('vendor'),
-  isVerifiedVendor,
+  authorize('admin'),
   uploadProductImages.array('images', 5),
   uploadImages
 );
@@ -44,30 +41,19 @@ router.post(
 // Add product review: any logged-in user
 router.post('/:id/reviews', protect, addReview);
 
-// Middleware: Admin or Vendor only
-const adminOrVendor = (req, res, next) => {
-  if (req.user.role === 'admin' || req.user.role === 'vendor') {
-    return next();
-  }
-  return res.status(403).json({
-    success: false,
-    message: 'Not authorized to access this route'
-  });
-};
-
-// Update product (admin or vendor)
+// Update product (admin)
 router.put(
   '/:id',
   protect,
-  adminOrVendor,
+  authorize('admin'),
   updateProduct
 );
 
-// Delete product (admin or vendor)
+// Delete product (admin)
 router.delete(
   '/:id',
   protect,
-  adminOrVendor,
+  authorize('admin'),
   deleteProduct
 );
 

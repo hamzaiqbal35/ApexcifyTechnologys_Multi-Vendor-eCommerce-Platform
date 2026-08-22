@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['customer', 'vendor', 'admin'],
+    enum: ['customer', 'admin'],
     default: 'customer'
   },
   phone: {
@@ -36,14 +36,7 @@ const userSchema = new mongoose.Schema({
     zipCode: String,
     country: String
   },
-  vendorInfo: {
-    businessName: String,
-    businessDescription: String,
-    isVerified: {
-      type: Boolean,
-      default: false
-    }
-  },
+
   avatar: {
     type: String,
     default: ''
@@ -67,14 +60,9 @@ userSchema.pre('save', async function(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Compare password method (original)
+// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
-};
-
-// Match password method (new)
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);

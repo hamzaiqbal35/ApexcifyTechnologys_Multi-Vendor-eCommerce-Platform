@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { EyeIcon, EyeOffIcon } from '@heroicons/react/outline';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import api from '../utils/api';
+import Swal from 'sweetalert2';
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -29,7 +30,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       await api.post(`/auth/reset-password/${token}`, { password });
-      alert('Password reset successfully. You can now log in.');
+      Swal.fire('Password reset successfully. You can now log in.');
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reset password');
@@ -39,99 +40,100 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Reset your password
-          </h2>
-        </div>
-        <form
-          className="mt-8 space-y-6"
-          onSubmit={handleSubmit}
-          autoComplete="on"
-        >
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="reset-password" className="block text-sm font-medium text-gray-700">
-                New Password
-              </label>
-              <div className="relative">
-                <input
-                  id="reset-password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
-                  placeholder="Minimum 6 characters"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
-                  tabIndex="-1"
-                >
-                  {showPassword ? (
-                    <EyeOffIcon className="h-5 w-5" aria-hidden="true" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="reset-confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm New Password
-              </label>
-              <div className="relative">
-                <input
-                  id="reset-confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
-                  placeholder="Confirm your password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
-                  tabIndex="-1"
-                >
-                  {showConfirmPassword ? (
-                    <EyeOffIcon className="h-5 w-5" aria-hidden="true" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-            </div>
+    <div className="h-[calc(100vh-64px)] overflow-hidden lg:grid lg:grid-cols-2 animate-fade-in">
+      {/* Left Side: Form */}
+      <div className="flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24 bg-[#F9F9F9] h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-sm lg:w-96">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-[#000000]">
+              Reset your password
+            </h2>
+            <p className="mt-2 text-sm text-[#646464]">
+              Enter your new password below.
+            </p>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
-            >
-              {loading ? 'Resetting...' : 'Reset password'}
-            </button>
+          <div className="mt-8">
+            <form className="space-y-6" onSubmit={handleSubmit} autoComplete="on">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <div>
+                <label htmlFor="reset-password" className="block text-sm font-medium text-[#000000] mb-1">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="reset-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="input-field pr-10"
+                    placeholder="Minimum 6 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#A7A7A7] hover:text-[#000000] transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reset-confirmPassword" className="block text-sm font-medium text-[#000000] mb-1">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="reset-confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="input-field pr-10"
+                    placeholder="Confirm your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#A7A7A7] hover:text-[#000000] transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full flex justify-center items-center py-2.5 mt-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Reset password'}
+              </button>
+            </form>
           </div>
-        </form>
+        </div>
+      </div>
+
+      {/* Right Side: Image */}
+      <div className="hidden lg:block relative w-full h-full bg-[#000000]">
+        <img
+          className="absolute inset-0 h-full w-full object-cover opacity-90"
+          src="/images/auth-bg.jpg"
+          alt="Premium Authentication Background"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none"></div>
       </div>
     </div>
   );
 };
 
 export default ResetPassword;
-
-

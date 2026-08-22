@@ -5,7 +5,7 @@ const Product = require('../models/Product');
 // @access  Public
 const getProducts = async (req, res) => {
   try {
-    const { category, search, vendor, page = 1, limit = 12 } = req.query;
+    const { category, search, page = 1, limit = 12 } = req.query;
     const query = { isActive: true };
 
     if (category) query.category = category;
@@ -15,10 +15,8 @@ const getProducts = async (req, res) => {
         { description: { $regex: search, $options: 'i' } }
       ];
     }
-    if (vendor) query.vendor = vendor;
 
     const products = await Product.find(query)
-      .populate('vendor', 'name email vendorInfo.businessName')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
@@ -42,7 +40,7 @@ const getProducts = async (req, res) => {
 // @access  Private/Admin
 const getAllProductsAdmin = async (req, res) => {
   try {
-    const { category, search, vendor, page = 1, limit = 12 } = req.query;
+    const { category, search, page = 1, limit = 12 } = req.query;
     const query = {}; // No isActive filter for admin
 
     if (category) query.category = category;
@@ -52,10 +50,8 @@ const getAllProductsAdmin = async (req, res) => {
         { description: { $regex: search, $options: 'i' } }
       ];
     }
-    if (vendor) query.vendor = vendor;
 
     const products = await Product.find(query)
-      .populate('vendor', 'name email vendorInfo.businessName')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
@@ -80,7 +76,6 @@ const getAllProductsAdmin = async (req, res) => {
 const getProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('vendor', 'name email vendorInfo.businessName vendorInfo.businessDescription')
       .populate('reviews.user', 'name avatar');
 
     if (!product) {
@@ -98,16 +93,22 @@ const getProduct = async (req, res) => {
 
 // @desc    Create product
 // @route   POST /api/products
-// @access  Private/Vendor
+// @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
+    const { name, description, price, category, images, stock, tags } = req.body;
+
     const product = await Product.create({
-      ...req.body,
-      vendor: req.user._id
+      name,
+      description,
+      price,
+      category,
+      images,
+      stock,
+      tags
     });
 
-    const populatedProduct = await Product.findById(product._id)
-      .populate('vendor', 'name email vendorInfo.businessName');
+    const populatedProduct = await Product.findById(product._id);
 
     res.status(201).json({
       success: true,
@@ -120,7 +121,7 @@ const createProduct = async (req, res) => {
 
 // @desc    Update product
 // @route   PUT /api/products/:id
-// @access  Private (Admin: isActive only, Vendor: full update)
+// @access  Private (Admin)
 const updateProduct = async (req, res) => {
   try {
     let product = await Product.findById(req.params.id);
@@ -129,40 +130,11 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // ADMIN CAN ONLY UPDATE isActive
-    if (req.user.role === 'admin') {
-      if (Object.keys(req.body).length > 1 || req.body.isActive === undefined) {
-        return res.status(403).json({
-          success: false,
-          message: 'Admins can only update the isActive status of products'
-        });
-      }
-
-      const updatedProduct = await Product.findByIdAndUpdate(
-        req.params.id,
-        { isActive: req.body.isActive },
-        { new: true, runValidators: true }
-      ).populate('vendor', 'name email vendorInfo.businessName');
-
-      return res.json({
-        success: true,
-        product: updatedProduct
-      });
-    }
-
-    // VENDOR OWNERSHIP CHECK
-    if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this product'
-      });
-    }
-
-    // VENDOR FULL UPDATE
+    // ADMIN FULL UPDATE
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
-    }).populate('vendor', 'name email vendorInfo.businessName');
+    });
 
     res.json({
       success: true,
@@ -175,7 +147,7 @@ const updateProduct = async (req, res) => {
 
 // @desc    Delete product
 // @route   DELETE /api/products/:id
-// @access  Private (Vendor own product / Admin can delete all)
+// @access  Private (Admin)
 const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -187,13 +159,7 @@ const deleteProduct = async (req, res) => {
       });
     }
 
-    // ADMIN CAN DELETE ANYTHING – VENDOR ONLY THEIR OWN PRODUCT
-    if (req.user.role !== 'admin' && product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this product'
-      });
-    }
+
 
     // Use deleteOne() instead of remove()
     await Product.deleteOne({ _id: product._id });
@@ -254,7 +220,7 @@ const addReview = async (req, res) => {
 
 // @desc    Upload product images
 // @route   POST /api/products/upload-images
-// @access  Private/Vendor
+// @access  Private/Admin
 const uploadImages = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {

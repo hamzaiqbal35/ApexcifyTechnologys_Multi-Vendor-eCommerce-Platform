@@ -2,60 +2,52 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import ProductCard from '../components/ProductCard';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [banners, setBanners] = useState([]);
 
-  // Hero slides data - you can replace these with your actual images
   const heroSlides = [
     {
-      image: 'src/assets/slide1.jpeg',
-      title: 'Welcome to Our Store',
-      subtitle: 'Discover amazing products from trusted vendors',
-      buttonText: 'Shop Now',
-      buttonLink: '/products'
+      title: 'Premium E-Commerce Platform.',
+      subtitle: 'Discover meticulously crafted products from our premium catalog.',
+      buttonText: 'Shop the Collection',
+      buttonLink: '/products',
+      bgClass: 'bg-gray-100'
     },
     {
-      image: 'src/assets/slide2.jpg',
-      title: 'Premium Quality Products',
-      subtitle: 'Shop the latest trends and best deals',
-      buttonText: 'About us',
-      buttonLink: '/About'
-    },
-    {
-      image: 'src/assets/slide3.jpg',
-      title: 'Multi-Vendor Marketplace',
-      subtitle: 'Connect with sellers from around the world',
-      buttonText: 'Contact',
-      buttonLink: '/Contact'
+      title: 'Built for Performance.',
+      subtitle: 'Experience lightning fast shopping with unparalleled design.',
+      buttonText: 'Learn About Us',
+      buttonLink: '/about',
+      bgClass: 'bg-gray-200'
     }
   ];
 
+  const activeSlides = banners.length > 0 ? banners : heroSlides;
+
   useEffect(() => {
     fetchProducts();
+    fetchBanners();
   }, []);
 
-  // Auto-play slideshow
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 5000); // Change slide every 5 seconds
-
+      setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
+    }, 6000);
     return () => clearInterval(interval);
-  }, [heroSlides.length]);
+  }, [activeSlides.length]);
 
-  const goToSlide = (index) => {
-    setCurrentSlide(index);
-  };
-
-  const goToPrevious = () => {
-    setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
-  };
-
-  const goToNext = () => {
-    setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+  const fetchBanners = async () => {
+    try {
+      const res = await api.get('/banners');
+      setBanners(res.data.banners || []);
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+    }
   };
 
   const fetchProducts = async () => {
@@ -64,135 +56,133 @@ const Home = () => {
       setProducts(res.data.products || []);
     } catch (error) {
       console.error('Error fetching products:', error);
-      // If it's a network error, the server might not be running
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        console.error('Server is not running or not accessible. Make sure the backend server is running on port 5000');
-      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section with Image Slideshow */}
-      <section className="relative h-[600px] md:h-[700px] overflow-hidden">
-        {/* Slides Container */}
-        <div className="relative w-full h-full">
-          {heroSlides.map((slide, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                index === currentSlide ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              {/* Background Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                style={{ backgroundImage: `url(${slide.image})` }}
-              >
-                {/* Overlay for better text readability */}
-                <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 h-full flex items-center justify-center">
-                <div className="container mx-auto px-4 text-center text-white">
-                  <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 animate-fade-in">
-                    {slide.title}
-                  </h1>
-                  <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto">
-                    {slide.subtitle}
-                  </p>
-                  <Link
-                    to={slide.buttonLink}
-                    className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 inline-block transform hover:scale-105 transition-transform duration-200 shadow-lg"
-                  >
-                    {slide.buttonText}
-                  </Link>
-                </div>
-              </div>
+    <div className="min-h-screen bg-background animate-fade-in">
+      {/* Hero Section */}
+      <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden border-b border-border bg-gray-50">
+        {activeSlides.map((slide, index) => (
+          <div
+            key={index}
+            className={`absolute inset-0 transition-opacity duration-1000 flex items-center justify-center ${
+              index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
+            }`}
+          >
+            <div className="container mx-auto px-6 text-center max-w-4xl relative z-20">
+              {slide.title && (
+                <h1 
+                  className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-tight"
+                  style={{ color: slide.textColor || '#000000' }}
+                >
+                  {slide.title}
+                </h1>
+              )}
+              {slide.subtitle && (
+                <p 
+                  className="text-lg md:text-xl mb-10 max-w-2xl mx-auto font-light"
+                  style={{ color: slide.textColor || '#4b5563' }}
+                >
+                  {slide.subtitle}
+                </p>
+              )}
+              {(slide.buttonLink || (slide.link && slide.link !== 'undefined' && slide.link !== 'null' && slide.link.trim() !== '')) && (
+                <Link
+                  to={slide.buttonLink || slide.link}
+                  className="inline-flex items-center justify-center bg-brand-gradient text-white px-8 py-4 rounded-full font-medium hover:opacity-90 transition-opacity group shadow-lg"
+                >
+                  {slide.buttonText || 'Shop Now'}
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              )}
             </div>
-          ))}
-        </div>
-
-        {/* Navigation Arrows */}
-        <button
-          onClick={goToPrevious}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-800 p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
-          aria-label="Previous slide"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-        <button
-          onClick={goToNext}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-800 p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
-          aria-label="Next slide"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
-
+            {/* Display Banner Image if exists, else abstract bg */}
+            {slide.imageUrl ? (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none flex items-center justify-center bg-gray-100">
+                <img src={`${import.meta.env.VITE_SERVER_URL}${slide.imageUrl}`} alt={slide.title || 'Banner'} className="w-full h-full object-cover object-center" />
+                {(slide.title || slide.subtitle) && (
+                  <div className="absolute inset-0 bg-black/30 md:bg-black/10"></div>
+                )}
+              </div>
+            ) : (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-gradient rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
+                 <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-brand-orange rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
+              </div>
+            )}
+          </div>
+        ))}
+        
         {/* Slide Indicators */}
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
-          {heroSlides.map((_, index) => (
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 flex space-x-3">
+          {activeSlides.map((_, index) => (
             <button
               key={index}
-              onClick={() => goToSlide(index)}
-              className={`h-3 rounded-full transition-all duration-300 ${
-                index === currentSlide
-                  ? 'w-8 bg-white'
-                  : 'w-3 bg-white bg-opacity-50 hover:bg-opacity-75'
+              onClick={() => setCurrentSlide(index)}
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                index === currentSlide ? 'w-12 bg-black' : 'w-4 bg-gray-300 hover:bg-gray-400'
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />
           ))}
         </div>
+        {/* Navigation Arrows */}
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev - 1 + activeSlides.length) % activeSlides.length)}
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="w-8 h-8 text-black" />
+        </button>
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev + 1) % activeSlides.length)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md"
+          aria-label="Next slide"
+        >
+          <ChevronRight className="w-8 h-8 text-black" />
+        </button>
       </section>
 
       {/* Featured Products */}
-      <section className="container mx-auto px-4 py-12">
-        <h2 className="text-3xl font-bold mb-8">Featured Products</h2>
+      <section className="container mx-auto px-6 py-24">
+        <div className="flex justify-between items-end mb-12">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-black mb-2">Featured Products</h2>
+            <p className="text-gray-500">Curated picks for you.</p>
+          </div>
+          <Link to="/products" className="hidden sm:inline-flex items-center text-sm font-medium text-black hover:text-gray-600 transition-colors">
+            View all <ArrowRight className="ml-1 w-4 h-4" />
+          </Link>
+        </div>
+
         {loading ? (
-          <div className="text-center py-12">Loading products...</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="animate-pulse flex flex-col gap-4">
+                <div className="bg-gray-100 aspect-square rounded-lg"></div>
+                <div className="h-4 bg-gray-100 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-100 rounded w-1/4"></div>
+              </div>
+            ))}
+          </div>
         ) : products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {products.map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-500">No products available</div>
+          <div className="text-center py-24 border border-border rounded-xl bg-gray-50">
+            <p className="text-gray-500">No products available at the moment.</p>
+          </div>
         )}
-        <div className="text-center mt-8">
-          <Link
-            to="/products"
-            className="text-blue-600 hover:text-blue-800 font-semibold"
-          >
-            View All Products →
+        
+        <div className="mt-12 text-center sm:hidden">
+          <Link to="/products" className="inline-flex items-center justify-center w-full px-6 py-3 border border-border rounded-lg text-black font-medium hover:bg-gray-50 transition-colors">
+            View all products
           </Link>
         </div>
       </section>
@@ -201,4 +191,3 @@ const Home = () => {
 };
 
 export default Home;
-

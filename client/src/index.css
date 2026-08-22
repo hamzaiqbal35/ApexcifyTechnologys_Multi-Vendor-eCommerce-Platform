@@ -2,53 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 1s ease-in-out;
-  }
-  
-  .animate-in {
-    animation: fadeInSlide 0.2s ease-out;
-  }
-  
-  .fade-in {
-    animation: fadeIn 0.2s ease-out;
-  }
-  
-  .slide-in-from-top {
-    animation: slideInFromTop 0.2s ease-out;
+@layer base {
+  body {
+    @apply bg-[#F9F9F9] text-[#000000] font-sans antialiased selection:bg-[#E85002] selection:text-white;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+@layer components {
+  .btn-primary {
+    @apply bg-[#E85002] text-white hover:opacity-90 px-5 py-2.5 rounded-lg font-semibold transition-all active:scale-[0.98] shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#E85002] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .btn-secondary {
+    @apply bg-[#F9F9F9] text-[#333333] border border-[#A7A7A7] hover:bg-gray-100 px-5 py-2.5 rounded-lg font-semibold transition-all active:scale-[0.98] shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#646464] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-field {
+    @apply w-full border border-[#A7A7A7] rounded-lg px-4 py-2.5 bg-[#F9F9F9] outline-none focus:border-[#646464] focus:ring-1 focus:ring-[#646464] transition-all text-sm shadow-sm;
+  }
+
+  .card {
+    @apply bg-white border border-[#A7A7A7]/50 rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-shadow duration-300 overflow-hidden;
   }
 }
 
-@keyframes fadeInSlide {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Lenis smooth scroll or default smooth scroll */
+html {
+  scroll-behavior: smooth;
 }
 
-@keyframes slideInFromTop {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Custom Scrollbar for a premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
+
+/* SweetAlert2 Premium Theme Overrides */
+div:where(.swal2-container) div:where(.swal2-popup) {
+  border-radius: 16px !important;
+  border: 1px solid rgba(167, 167, 167, 0.2) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1) !important;
+  padding: 2.5rem 2rem !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-family: inherit !important;
+}
+
+div:where(.swal2-container) h2:where(.swal2-title) {
+  font-weight: 800 !important;
+  font-size: 1.5rem !important;
+  color: #111111 !important;
+  padding: 0 0 0.5rem 0 !important;
+}
+
+div:where(.swal2-container) div:where(.swal2-html-container) {
+  color: #646464 !important;
+  font-size: 1rem !important;
+  margin: 0 0 2rem 0 !important;
+  font-weight: 400 !important;
+}
+
+div:where(.swal2-container) button:where(.swal2-confirm) {
+  background-color: #E85002 !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 0.75rem 2rem !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  transition: all 0.2s !important;
+  box-shadow: 0 4px 14px rgba(232, 80, 2, 0.25) !important;
+}
+
+div:where(.swal2-container) button:where(.swal2-confirm):hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(232, 80, 2, 0.35) !important;
+  background-color: #d14702 !important;
+}
+
+div:where(.swal2-container) button:where(.swal2-cancel) {
+  background-color: #F9F9F9 !important;
+  color: #333333 !important;
+  border: 1px solid #A7A7A7 !important;
+  border-radius: 8px !important;
+  padding: 0.75rem 2rem !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  transition: all 0.2s !important;
+  margin-left: 1rem !important;
+}
+
+div:where(.swal2-container) button:where(.swal2-cancel):hover {
+  background-color: #f1f1f1 !important;
+}
+
+div:where(.swal2-container) div:where(.swal2-icon) {
+  border-color: #E85002 !important;
+  color: #E85002 !important;
+  margin-bottom: 1.5rem !important;
+}
+
+div:where(.swal2-container) div:where(.swal2-icon).swal2-error {
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+
+div:where(.swal2-container) div:where(.swal2-icon).swal2-success {
+  border-color: #22c55e !important;
+  color: #22c55e !important;
 }

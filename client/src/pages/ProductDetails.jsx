@@ -4,22 +4,23 @@ import api from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
+import { Star, Minus, Plus, Loader2, ArrowLeft } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { isAuthenticated, isVendor, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [review, setReview] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
-
+  const [activeImage, setActiveImage] = useState(0);
   useEffect(() => {
     fetchProduct();
   }, [id]);
-
   const fetchProduct = async () => {
     try {
       const res = await api.get(`/products/${id}`);
@@ -31,30 +32,23 @@ const ProductDetails = () => {
     }
   };
 
-  const VENDOR_BULK_MIN = 10;
-
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      alert('Please login to add items to cart');
       navigate('/login');
-      return;
-    }
-    if (isVendor && quantity < VENDOR_BULK_MIN) {
-      alert(`As a vendor, you can only place bulk orders. Minimum quantity is ${VENDOR_BULK_MIN}.`);
       return;
     }
     try {
       await addToCart(product._id, quantity);
-      alert('Product added to cart!');
+      // Optional: Add a toast notification here
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to add to cart');
+      Swal.fire(error.response?.data?.message || 'Failed to add to cart');
     }
   };
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('Please login to submit a review');
+      navigate('/login');
       return;
     }
     try {
@@ -62,191 +56,222 @@ const ProductDetails = () => {
       await api.post(`/products/${id}/reviews`, review);
       await fetchProduct();
       setReview({ rating: 5, comment: '' });
-      alert('Review submitted successfully!');
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to submit review');
+      Swal.fire(error.response?.data?.message || 'Failed to submit review');
     } finally {
       setSubmittingReview(false);
     }
   };
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-12 text-center">Loading...</div>;
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-black" />
+      </div>
+    );
   }
 
   if (!product) {
-    return <div className="container mx-auto px-4 py-12 text-center">Product not found</div>;
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center">
+        <p className="text-xl font-medium text-black">Product not found</p>
+        <button onClick={() => navigate('/products')} className="mt-4 text-gray-500 hover:text-black flex items-center">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Store
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        {/* Product Images */}
-        <div>
-          <img
-            src={product.images?.[0] || 'https://via.placeholder.com/500'}
-            alt={product.name}
-            className="w-full rounded-lg shadow-md"
-          />
-          {product.images?.length > 1 && (
-            <div className="grid grid-cols-4 gap-2 mt-4">
-              {product.images.slice(1, 5).map((img, idx) => (
-                <img
-                  key={idx}
-                  src={img}
-                  alt={`${product.name} ${idx + 2}`}
-                  className="w-full h-24 object-cover rounded cursor-pointer hover:opacity-75"
-                />
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="bg-white min-h-screen animate-fade-in">
+      <div className="container mx-auto px-6 py-12">
+        <button onClick={() => navigate(-1)} className="mb-8 text-sm font-medium text-gray-500 hover:text-black flex items-center transition-colors">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
+        </button>
 
-        {/* Product Info */}
-        <div>
-          <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
-          <div className="flex items-center mb-4">
-            {product.averageRating > 0 && (
-              <>
-                <span className="text-yellow-400 text-2xl">★</span>
-                <span className="ml-2 text-xl">{product.averageRating}</span>
-                <span className="ml-2 text-gray-600">({product.numReviews} reviews)</span>
-              </>
-            )}
-          </div>
-          <p className="text-3xl font-bold text-blue-600 mb-4">{formatPricePKR(product.price)}</p>
-          <p className="text-gray-700 mb-6">{product.description}</p>
-          
-          <div className="mb-6">
-            <p className="text-sm text-gray-600 mb-2">Category: <span className="font-semibold">{product.category}</span></p>
-            <p className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {product.stock > 0 ? `In Stock (${product.stock} available)` : 'Out of Stock'}
-            </p>
-            {product.vendor && (
-              <p className="text-sm text-gray-600 mt-2">
-                Sold by: <span className="font-semibold">{product.vendor.vendorInfo?.businessName || product.vendor.name}</span>
-              </p>
-            )}
-          </div>
-
-          <div className="mb-6">
-            <label htmlFor="product-quantity" className="font-semibold block mb-2">Quantity:</label>
-            <input
-              id="product-quantity"
-              name="quantity"
-              type="number"
-              min={isVendor ? VENDOR_BULK_MIN : 1}
-              max={product.stock}
-              value={quantity}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                const min = isVendor ? VENDOR_BULK_MIN : 1;
-                setQuantity(value < min ? min : value);
-              }}
-              className="w-20 px-3 py-2 border rounded"
-              aria-label="Product quantity"
-            />
-          </div>
-
-          {!isAdmin && (
-            <button
-              onClick={handleAddToCart}
-              disabled={product.stock === 0}
-              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              Add to Cart
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Reviews Section */}
-      <div className="mt-12">
-        <h2 className="text-2xl font-bold mb-6">Reviews</h2>
-        
-        {/* Add Review Form */}
-        {isAuthenticated && (
-          <form onSubmit={handleSubmitReview} className="bg-gray-50 p-6 rounded-lg mb-8">
-            <h3 className="text-xl font-semibold mb-4">Write a Review</h3>
-            <div className="mb-4">
-              <label htmlFor="review-rating" className="block font-semibold mb-2">Rating</label>
-              <select
-                id="review-rating"
-                name="rating"
-                value={review.rating}
-                onChange={(e) => setReview({ ...review, rating: parseInt(e.target.value) })}
-                className="px-3 py-2 border rounded"
-                aria-label="Select rating"
-              >
-                <option value={5}>5 Stars</option>
-                <option value={4}>4 Stars</option>
-                <option value={3}>3 Stars</option>
-                <option value={2}>2 Stars</option>
-                <option value={1}>1 Star</option>
-              </select>
-            </div>
-            <div className="mb-4">
-              <label htmlFor="review-comment" className="block font-semibold mb-2">Comment</label>
-              <textarea
-                id="review-comment"
-                name="comment"
-                value={review.comment}
-                onChange={(e) => setReview({ ...review, comment: e.target.value })}
-                rows="4"
-                className="w-full px-3 py-2 border rounded"
-                placeholder="Share your thoughts about this product..."
-                aria-label="Write your review"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
+          {/* Product Images */}
+          <div className="space-y-4">
+            <div className="aspect-square bg-gray-50 border border-border rounded-2xl overflow-hidden flex items-center justify-center p-8">
+              <img
+                src={product.images?.[activeImage] || 'https://via.placeholder.com/600'}
+                alt={product.name}
+                className="max-w-full max-h-full object-contain mix-blend-multiply"
               />
             </div>
-            <button
-              type="submit"
-              disabled={submittingReview}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {submittingReview ? 'Submitting...' : 'Submit Review'}
-            </button>
-          </form>
-        )}
-
-        {/* Reviews List */}
-        {product.reviews && product.reviews.length > 0 ? (
-          <div className="space-y-4">
-            {product.reviews.map((review, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {review.user?.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-semibold">{review.user?.name || 'Anonymous'}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(review.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <span
-                        key={i}
-                        className={i < review.rating ? 'text-yellow-400' : 'text-gray-300'}
-                      >
-                        ★
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {review.comment && <p className="text-gray-700 mt-2">{review.comment}</p>}
+            {product.images?.length > 1 && (
+              <div className="grid grid-cols-4 gap-4">
+                {product.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImage(idx)}
+                    className={`aspect-square bg-gray-50 border rounded-xl overflow-hidden transition-all ${
+                      activeImage === idx ? 'border-black ring-1 ring-black' : 'border-border hover:border-gray-400'
+                    }`}
+                  >
+                    <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover mix-blend-multiply p-2" />
+                  </button>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <p className="text-gray-500">No reviews yet. Be the first to review!</p>
-        )}
+
+          {/* Product Info */}
+          <div className="flex flex-col justify-center">
+            <div className="mb-2">
+              <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{product.category}</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-black mb-4 leading-tight">{product.name}</h1>
+            
+            <div className="flex items-center gap-4 mb-8">
+              <p className="text-3xl font-medium tracking-tight text-black">{formatPricePKR(product.price)}</p>
+              {product.averageRating > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 border border-border rounded-full text-sm">
+                  <Star className="w-4 h-4 fill-black text-black" />
+                  <span className="font-semibold">{product.averageRating.toFixed(1)}</span>
+                  <span className="text-gray-500 font-normal">({product.numReviews})</span>
+                </div>
+              )}
+            </div>
+
+            <div className="prose prose-sm md:prose-base text-gray-600 mb-10 leading-relaxed">
+              <p>{product.description}</p>
+            </div>
+            
+            <div className="border-t border-border pt-8 mb-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div>
+                  <p className="text-sm font-medium text-black mb-1">Status</p>
+                  <p className={`text-sm ${product.stock > 0 ? 'text-gray-600' : 'text-red-600'}`}>
+                    {product.stock > 0 ? `${product.stock} units available` : 'Out of Stock'}
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex items-center border border-border rounded-lg h-12 w-full sm:w-32 bg-white">
+                <button 
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="flex-1 flex items-center justify-center hover:bg-gray-50 transition-colors h-full rounded-l-lg text-gray-500 hover:text-black"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex-1 flex items-center justify-center text-sm font-medium text-black border-x border-border h-full">
+                  {quantity}
+                </div>
+                <button 
+                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                  className="flex-1 flex items-center justify-center hover:bg-gray-50 transition-colors h-full rounded-r-lg text-gray-500 hover:text-black"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {!isAdmin && (
+                <button
+                  onClick={handleAddToCart}
+                  disabled={product.stock === 0}
+                  className="flex-1 btn-primary h-12 text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add to Cart
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="border-t border-border pt-16 mt-16 max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold tracking-tight text-black mb-10">Customer Reviews</h2>
+          
+          {/* Reviews List */}
+          <div className="space-y-8 mb-16">
+            {product.reviews && product.reviews.length > 0 ? (
+              product.reviews.map((rev, idx) => (
+                <div key={idx} className="pb-8 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-gray-100 border border-border rounded-full flex items-center justify-center text-black font-semibold text-sm">
+                        {rev.user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-black">{rev.user?.name || 'Anonymous'}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(rev.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className={`w-4 h-4 ${i < rev.rating ? 'fill-black text-black' : 'fill-gray-200 text-gray-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  {rev.comment && <p className="text-gray-600 text-sm leading-relaxed">{rev.comment}</p>}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-border">
+                <p className="text-gray-500">No reviews yet. Be the first to share your thoughts!</p>
+              </div>
+            )}
+          </div>
+
+          {/* Add Review Form */}
+          {isAuthenticated ? (
+            <div className="bg-gray-50 border border-border rounded-2xl p-8">
+              <h3 className="text-lg font-bold text-black mb-6">Write a Review</h3>
+              <form onSubmit={handleSubmitReview} className="space-y-6">
+                <div>
+                  <label htmlFor="review-rating" className="block text-sm font-medium text-black mb-2">Rating</label>
+                  <select
+                    id="review-rating"
+                    name="rating"
+                    value={review.rating}
+                    onChange={(e) => setReview({ ...review, rating: parseInt(e.target.value) })}
+                    className="input-field max-w-xs"
+                  >
+                    <option value={5}>5 - Excellent</option>
+                    <option value={4}>4 - Good</option>
+                    <option value={3}>3 - Average</option>
+                    <option value={2}>2 - Poor</option>
+                    <option value={1}>1 - Terrible</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="review-comment" className="block text-sm font-medium text-black mb-2">Your Review</label>
+                  <textarea
+                    id="review-comment"
+                    name="comment"
+                    value={review.comment}
+                    onChange={(e) => setReview({ ...review, comment: e.target.value })}
+                    rows="4"
+                    className="input-field resize-none bg-white"
+                    placeholder="What did you like or dislike?"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="btn-primary px-8 flex items-center"
+                >
+                  {submittingReview ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="text-center mt-8">
+              <p className="text-sm text-gray-500">Please <a href="/login" className="text-black font-medium underline underline-offset-4">log in</a> to write a review.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 export default ProductDetails;
-

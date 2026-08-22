@@ -13,11 +13,6 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 1
-  },
-  vendor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
   }
 });
 
@@ -38,8 +33,9 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['cash_on_delivery']
+    enum: ['cash_on_delivery', 'stripe']
   },
+  stripePaymentIntentId: String,
   paymentResult: {
     id: String,
     status: String,
@@ -83,41 +79,52 @@ const orderSchema = new mongoose.Schema({
   deliveredAt: Date,
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'processing', 'shipped', 'delivered', 'cancelled'],
+    enum: ['pending', 'accepted', 'processing', 'shipped', 'delivered', 'cancelled', 'return_requested', 'returned'],
     default: 'pending'
   },
   trackingNumber: String,
   courier: String,
   estimatedDeliveryDate: Date,
 
-  // vendor cancel request / admin review
-  vendorCancelRequested: {
-    type: Boolean,
-    default: false
-  },
-  vendorCancelReason: String,
-  vendorCancelRequestedAt: Date,
 
-  // vendor payment record (when vendor receives payment offline)
-  vendorPayment: {
-    by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    amount: Number,
-    method: String,
-    transactionId: String,
-    receivedAt: Date
-  },
 
   // cancellation/refund fields
   cancellationReason: String,
+  returnReason: String,
   cancelledAt: Date,
+  returnedAt: Date,
   isRefunded: {
     type: Boolean,
     default: false
   },
-  refundedAt: Date
+  refundedAt: Date,
+
+  // status tracking
+  statusHistory: [{
+    status: String,
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    note: String
+  }]
 }, {
   timestamps: true
 });
+
+// ============================================
+// VALID STATUS TRANSITIONS
+// ============================================
+orderSchema.statics.VALID_TRANSITIONS = {
+  pending: ['accepted', 'cancelled'],
+  accepted: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['return_requested'],
+  return_requested: ['returned', 'delivered'], // moving back to delivered means return rejected
+  returned: [],
+  cancelled: []
+};
 
 // ============================================
 // MIDDLEWARE TO MAINTAIN STATUS CONSISTENCY
@@ -129,7 +136,11 @@ orderSchema.pre('save', function (next) {
     return next();
   }
 
-  console.log(`🔄 Syncing order ${this._id || 'new'} status: ${this.status}`);
+  // Push to status history if it's a new document or status changed
+  this.statusHistory.push({
+    status: this.status,
+    timestamp: Date.now()
+  });
 
   // Synchronize all status-related fields based on the main status
   switch (this.status) {
@@ -209,13 +220,11 @@ orderSchema.pre('save', function (next) {
 
   // Prevent setting isDelivered without proper status
   if (this.isModified('isDelivered') && this.isDelivered && this.status !== 'delivered') {
-    console.warn(`⚠️  Warning: isDelivered set to true but status is ${this.status}. Syncing status to 'delivered'.`);
     this.status = 'delivered';
   }
 
   // Prevent setting isShipped without proper status
   if (this.isModified('isShipped') && this.isShipped && !['shipped', 'delivered'].includes(this.status)) {
-    console.warn(`⚠️  Warning: isShipped set to true but status is ${this.status}. Syncing status to 'shipped'.`);
     this.status = 'shipped';
   }
 

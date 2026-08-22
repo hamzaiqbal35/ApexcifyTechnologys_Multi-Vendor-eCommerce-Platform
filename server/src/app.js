@@ -13,6 +13,11 @@ const userRoutes = require('./routes/userRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const bannerRoutes = require('./routes/bannerRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const { handleWebhook } = require('./controllers/paymentController');
+const { apiLimiter, authLimiter, orderLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
@@ -21,21 +26,38 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
+
+// Stripe webhook must use raw body parser BEFORE express.json()
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// Apply global rate limiting
+app.use('/api', apiLimiter);
+
+// Make uploads folder static
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/users', userRoutes);
 app.use('/api', contactRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/banners', bannerRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/settings', settingsRoutes);
+
+// Apply specific limiters to specific routes
+app.use('/api/users/login', authLimiter);
+app.use('/api/users/register', authLimiter);
+app.use('/api/orders', orderLimiter); // Protects POST /api/orders
 
 // Root route - API information
 app.get('/', (req, res) => {
@@ -64,8 +86,17 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error',
+  
+  const status = err.status || 500;
+  let message = err.message || 'Internal Server Error';
+
+  // Mask generic 500 errors in production to avoid leaking sensitive details
+  if (process.env.NODE_ENV === 'production' && status === 500) {
+    message = 'Something went wrong on our end. Please try again later.';
+  }
+
+  res.status(status).json({
+    message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });

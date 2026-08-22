@@ -4,96 +4,167 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const Cart = require('../models/Cart');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+const processStripeRefund = async (order) => {
+  if (order.paymentMethod === 'stripe' && order.isPaid && order.stripePaymentIntentId) {
+    try {
+      await stripe.refunds.create({
+        payment_intent: order.stripePaymentIntentId,
+      });
+      order.isRefunded = true;
+      order.refundedAt = new Date();
+      order.isPaid = false;
+      order.paidAt = null;
+    } catch (error) {
+      console.error('Stripe refund failed:', error.message);
+      throw new Error(`Refund failed: ${error.message}`);
+    }
+  } else if (order.isPaid) {
+    // Fallback for COD or if no intent ID, just mark it conceptually
+    order.isRefunded = true;
+    order.refundedAt = new Date();
+    order.isPaid = false;
+    order.paidAt = null;
+  }
+};
 
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
 const createOrder = async (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const session = isProduction ? await mongoose.startSession() : null;
+  
+  if (isProduction) {
+    session.startTransaction();
+  }
+
   try {
     const { shippingAddress, paymentMethod } = req.body;
 
-    const cart = await Cart.findOne({ user: req.user._id })
-      .populate('items.product');
+    const cartQuery = Cart.findOne({ user: req.user._id }).populate('items.product');
+    if (isProduction) cartQuery.session(session);
+    const cart = await cartQuery;
 
     if (!cart || cart.items.length === 0) {
+      if (isProduction) {
+        await session.abortTransaction();
+        session.endSession();
+      }
       return res.status(400).json({ message: 'Cart is empty' });
     }
 
-    // Group items by vendor
-    const itemsByVendor = {};
     let itemsPrice = 0;
+    const orderItems = [];
 
     for (const item of cart.items) {
-      const product = await Product.findById(item.product._id);
+      const productQuery = Product.findById(item.product._id);
+      if (isProduction) productQuery.session(session);
+      const productDoc = await productQuery;
 
-      if (product.stock < item.quantity) {
+      if (!productDoc) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
+        return res.status(404).json({ message: `Product not found: ${item.product._id}` });
+      }
+
+      if (!productDoc.isActive) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
+        return res.status(400).json({ message: `Product ${productDoc.name} is no longer active` });
+      }
+
+      // Atomic check and decrement for stock
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: item.product._id, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        isProduction ? { new: true, session } : { new: true }
+      );
+
+      if (!updatedProduct) {
+        if (isProduction) {
+          await session.abortTransaction();
+          session.endSession();
+        }
         return res.status(400).json({
-          message: `Insufficient stock for ${product.name}`
+          message: `Insufficient stock for ${productDoc.name}`
         });
       }
 
-      const vendorId = product.vendor.toString();
-      if (!itemsByVendor[vendorId]) {
-        itemsByVendor[vendorId] = [];
-      }
-
-      itemsByVendor[vendorId].push({
-        product: product._id,
-        name: product.name,
-        image: product.images[0] || '',
-        price: product.price,
-        quantity: item.quantity,
-        vendor: vendorId
+      orderItems.push({
+        product: productDoc._id,
+        name: productDoc.name,
+        image: productDoc.images[0] || '',
+        price: productDoc.price,
+        quantity: item.quantity
       });
 
-      itemsPrice += product.price * item.quantity;
+      itemsPrice += productDoc.price * item.quantity;
     }
 
-    // Create orders for each vendor
-    const orders = [];
-    for (const vendorId in itemsByVendor) {
-      const orderItems = itemsByVendor[vendorId];
-      const orderItemsPrice = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const shippingPrice = 10;
-      const taxPrice = orderItemsPrice * 0.1;
-      const totalPrice = orderItemsPrice + shippingPrice + taxPrice;
-
-      const order = await Order.create({
-        user: req.user._id,
-        orderItems,
-        shippingAddress,
-        paymentMethod,
-        itemsPrice: orderItemsPrice,
-        shippingPrice,
-        taxPrice,
-        totalPrice,
-        status: 'pending'
-      });
-
-      // Update product stock
-      for (const item of orderItems) {
-        await Product.findByIdAndUpdate(item.product, {
-          $inc: { stock: -item.quantity }
-        });
+    // Fetch dynamic shipping settings
+    const Settings = require('../models/Settings');
+    const settingsQuery = Settings.findOne({ isGlobal: true });
+    if (isProduction) settingsQuery.session(session);
+    const settings = await settingsQuery;
+    
+    let shippingPrice = 10; // default fallback
+    if (settings && settings.shipping) {
+      if (settings.shipping.isTiered && itemsPrice >= settings.shipping.freeShippingThreshold) {
+        shippingPrice = 0; // Free shipping
+      } else {
+        shippingPrice = settings.shipping.flatRate;
       }
-
-      orders.push(order);
     }
+
+    let taxRate = 0.1;
+    if (settings && settings.tax && settings.tax.rate !== undefined) {
+      taxRate = settings.tax.rate / 100;
+    }
+    const taxPrice = itemsPrice * taxRate;
+    const totalPrice = itemsPrice + shippingPrice + taxPrice;
+
+    const [order] = await Order.create([{
+      user: req.user._id,
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      stripePaymentIntentId: req.body.stripePaymentIntentId, // Handle stripe
+      itemsPrice,
+      shippingPrice,
+      taxPrice,
+      totalPrice,
+      status: 'pending'
+    }], isProduction ? { session } : {});
 
     cart.items = [];
-    await cart.save();
+    await cart.save(isProduction ? { session } : {});
+
+    if (isProduction) {
+      await session.commitTransaction();
+      session.endSession();
+    }
 
     try {
-      await sendOrderConfirmationEmail(req.user.email, orders);
+      await sendOrderConfirmationEmail(req.user.email, [order]);
     } catch (emailError) {
       console.error('Email sending failed:', emailError);
     }
 
     res.status(201).json({
       success: true,
-      orders
+      orders: [order]
     });
   } catch (error) {
+    if (isProduction && session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -105,8 +176,6 @@ const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
       .populate('orderItems.product', 'name images')
-      .populate('orderItems.vendor', 'name vendorInfo.businessName')
-      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -133,8 +202,7 @@ const updateOrder = async (req, res) => {
 
     // Find the order with the current items
     const order = await Order.findById(id)
-      .populate('orderItems.product')
-      .populate('orderItems.vendor');
+      .populate('orderItems.product');
 
     if (!order) {
       if (isProduction) {
@@ -242,8 +310,7 @@ const updateOrder = async (req, res) => {
         quantity: newQty,
         image: product.image || (product.images && product.images[0]) || '',
         price: product.price,
-        product: product._id,
-        vendor: product.vendor
+        product: product._id
       });
 
       itemsPrice += product.price * newQty;
@@ -274,7 +341,17 @@ const updateOrder = async (req, res) => {
     }
 
     // Update order
-    const taxPrice = itemsPrice * 0.1;
+    const Settings = require('../models/Settings');
+    const settingsQuery = Settings.findOne({ isGlobal: true });
+    if (isProduction) settingsQuery.session(session);
+    const settings = await settingsQuery;
+
+    let taxRate = 0.1;
+    if (settings && settings.tax && settings.tax.rate !== undefined) {
+      taxRate = settings.tax.rate / 100;
+    }
+    
+    const taxPrice = itemsPrice * taxRate;
     const shippingPrice = order.shippingPrice;
     const totalPrice = itemsPrice + taxPrice + shippingPrice;
 
@@ -335,7 +412,7 @@ const cancelOrder = async (req, res) => {
       });
     }
 
-    // Admin/Vendor can cancel if not shipped/delivered
+    // Admin can cancel if not shipped/delivered
     if (['shipped', 'delivered'].includes(order.status)) {
       return res.status(400).json({ message: 'Cannot cancel shipped or delivered orders' });
     }
@@ -354,20 +431,8 @@ const cancelOrder = async (req, res) => {
     order.cancellationReason = reason;
     order.cancelledAt = new Date();
 
-    // RESET ALL STATUS FLAGS TO MAINTAIN CONSISTENCY
-    order.isShipped = false;
-    order.shippedAt = null;
-    order.isDelivered = false;
-    order.deliveredAt = null;
-
-    // FORCE UNPAID ON CANCEL
-    if (order.isPaid) {
-      order.isRefunded = true;
-      order.refundedAt = new Date();
-    }
-
-    order.isPaid = false;
-    order.paidAt = null;
+    // Process Refund
+    await processStripeRefund(order);
 
     await order.save();
 
@@ -387,14 +452,12 @@ const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email')
-      .populate('orderItems.product', 'name images stock')
-      .populate('orderItems.vendor', 'name email vendorInfo.businessName');
+      .populate('orderItems.product', 'name images stock');
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     if (order.user._id.toString() !== req.user._id.toString() &&
-      req.user.role !== 'admin' &&
-      !order.orderItems.some(item => item.vendor._id.toString() === req.user._id.toString())) {
+      req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -409,10 +472,10 @@ const getOrder = async (req, res) => {
 
 // @desc    Update order status
 // @route   PUT /api/orders/:id/status
-// @access  Private (admin/vendor)
+// @access  Private (admin)
 const updateOrderStatus = async (req, res) => {
   try {
-    const { status, trackingNumber, courier, estimatedDeliveryDate } = req.body;
+    const { status, trackingNumber, courier, estimatedDeliveryDate, reason } = req.body;
     const order = await Order.findById(req.params.id)
       .populate('user', 'email name');
 
@@ -425,19 +488,21 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const isVendor = order.orderItems.some(
-      item => item.vendor.toString() === req.user._id.toString()
-    );
-
-    if (!isVendor && req.user.role !== 'admin') {
+    if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Validate status transitions
-    const validStatuses = ['pending', 'accepted', 'processing', 'shipped', 'delivered', 'cancelled'];
-    if (!validStatuses.includes(status)) {
+    const validNextStatuses = Order.VALID_TRANSITIONS[order.status];
+    if (!validNextStatuses) {
       return res.status(400).json({
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+        message: `Invalid current status: ${order.status}`
+      });
+    }
+
+    if (!validNextStatuses.includes(status) && order.status !== status) {
+      return res.status(400).json({
+        message: `Cannot transition order status from '${order.status}' to '${status}'. Valid next states are: ${validNextStatuses.join(', ') || 'none'}`
       });
     }
 
@@ -461,47 +526,41 @@ const updateOrderStatus = async (req, res) => {
     order.status = status;
     if (trackingNumber) order.trackingNumber = trackingNumber;
 
-    // CRITICAL: Synchronize all status-related fields based on the main status
-    switch (status) {
-      case 'pending':
-      case 'accepted':
-      case 'processing':
-        order.isShipped = false;
-        order.shippedAt = null;
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        break;
+    if (status === 'cancelled') {
+      if (!reason || reason.trim().length < 5) {
+        return res.status(400).json({
+          message: 'Cancellation reason is required and must be at least 5 characters long'
+        });
+      }
+      
+      order.cancellationReason = reason;
+      order.cancelledAt = new Date();
+      
+      
+      await processStripeRefund(order);
 
-      case 'shipped':
-        order.isShipped = true;
-        if (!order.shippedAt) order.shippedAt = new Date();
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        break;
-
-      case 'delivered':
-        order.isShipped = true;
-        if (!order.shippedAt) order.shippedAt = new Date();
-        order.isDelivered = true;
-        if (!order.deliveredAt) order.deliveredAt = new Date();
-        break;
-
-      case 'cancelled':
-        // Restore product stock when order is cancelled
-        for (const item of order.orderItems) {
-          if (item.product) {
-            await Product.findByIdAndUpdate(
-              item.product._id,
-              { $inc: { stock: item.quantity } }
-            );
-          }
+      // Restore product stock when order is cancelled
+      for (const item of order.orderItems) {
+        if (item.product) {
+          await Product.findByIdAndUpdate(
+            item.product._id,
+            { $inc: { stock: item.quantity } }
+          );
         }
-        order.isShipped = false;
-        order.shippedAt = null;
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        order.cancelledAt = new Date();
-        break;
+      }
+    } else if (status === 'returned') {
+      await processStripeRefund(order);
+      order.returnedAt = new Date();
+
+      // Restore product stock when order is returned
+      for (const item of order.orderItems) {
+        if (item.product) {
+          await Product.findByIdAndUpdate(
+            item.product._id,
+            { $inc: { stock: item.quantity } }
+          );
+        }
+      }
     }
 
     await order.save();
@@ -524,20 +583,25 @@ const updateOrderStatus = async (req, res) => {
 // @desc    Get all orders
 const getAllOrders = async (req, res) => {
   try {
-    let query = {};
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
 
-    if (req.user.role === 'vendor') {
-      query = { 'orderItems.vendor': req.user._id };
-    }
+    let query = {};
+    const count = await Order.countDocuments(query);
 
     const orders = await Order.find(query)
       .populate('user', 'name email')
       .populate('orderItems.product', 'name images')
-      .populate('orderItems.vendor', 'name vendorInfo.businessName')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       success: true,
+      count,
+      page,
+      pages: Math.ceil(count / limit),
       orders
     });
   } catch (error) {
@@ -547,7 +611,7 @@ const getAllOrders = async (req, res) => {
 
 // @desc    Toggle payment status
 // @route   PUT /api/orders/:id/pay
-// @access  Private (admin/vendor)
+// @access  Private (admin)
 const updateOrderPaymentToggle = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -599,49 +663,17 @@ const fixOrderConsistency = async (req, res) => {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
-    // Fix inconsistencies based on the main status field
-    const originalStatus = { ...order.toObject() };
-
-    switch (order.status) {
-      case 'pending':
-      case 'accepted':
-      case 'processing':
-        order.isShipped = false;
-        order.shippedAt = null;
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        break;
-
-      case 'shipped':
-        order.isShipped = true;
-        if (!order.shippedAt) order.shippedAt = new Date();
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        break;
-
-      case 'delivered':
-        order.isShipped = true;
-        if (!order.shippedAt) order.shippedAt = new Date();
-        order.isDelivered = true;
-        if (!order.deliveredAt) order.deliveredAt = new Date();
-        break;
-
-      case 'cancelled':
-        order.isShipped = false;
-        order.shippedAt = null;
-        order.isDelivered = false;
-        order.deliveredAt = null;
-        order.isPaid = false;
-        order.paidAt = null;
-        if (!order.cancelledAt) order.cancelledAt = new Date();
-        break;
-    }
+    // Fixing consistency is now fully handled by the pre-save hook in the Order model.
+    // By simply calling order.save(), the pre-save hook will re-evaluate the main status
+    // and correctly set isShipped, isDelivered, etc.
+    // To trigger it, we need to mark status as modified if it wasn't.
+    order.markModified('status');
 
     await order.save();
 
     res.json({
       success: true,
-      message: 'Order consistency fixed',
+      message: 'Order consistency fixed (handled by model pre-save hook)',
       changes: {
         before: originalStatus,
         after: order
@@ -652,48 +684,35 @@ const fixOrderConsistency = async (req, res) => {
   }
 };
 
-// @desc    Request order cancellation (vendor)
-// @route   PUT /api/orders/:id/cancel-request
-// @access  Private (vendor)
-const requestOrderCancellation = async (req, res) => {
+
+
+// @desc    Request a return for a delivered order
+// @route   PUT /api/orders/:id/return
+// @access  Private
+const requestReturn = async (req, res) => {
   try {
-    const { id } = req.params;
     const { reason } = req.body;
+    const order = await Order.findById(req.params.id);
 
-    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    // Verify vendor ownership
-    const isVendor = order.orderItems.some(
-      item => item.vendor.toString() === req.user._id.toString()
-    );
-
-    if (!isVendor) {
+    if (order.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    if (order.status === 'cancelled') {
-      return res.status(400).json({ message: 'Order is already cancelled' });
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ message: 'Only delivered orders can be returned' });
     }
 
-    if (order.status === 'delivered') {
-      return res.status(400).json({ message: 'Cannot cancel delivered orders' });
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({ message: 'Return reason is required (min 5 characters)' });
     }
 
-    order.vendorCancelRequested = true;
-    order.vendorCancelReason = reason;
-    order.vendorCancelRequestedAt = new Date();
-
+    order.status = 'return_requested';
+    order.returnReason = reason;
     await order.save();
 
-    res.json({
-      success: true,
-      message: 'Cancellation requested successfully',
-      order
-    });
+    res.json({ success: true, message: 'Return requested successfully', order });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -705,9 +724,9 @@ module.exports = {
   getOrder,
   updateOrder,
   cancelOrder,
+  requestReturn,
   updateOrderStatus,
   getAllOrders,
   updateOrderPaymentToggle,
-  fixOrderConsistency,
-  requestOrderCancellation
+  fixOrderConsistency
 };

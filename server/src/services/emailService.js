@@ -27,7 +27,7 @@ if (!SMTP_USER || !SMTP_PASS) {
   );
 }
 
-// Verify transporter on startup to catch mis‑configuration
+// Verify transporter on startup to catch misconfiguration
 transporter.verify((err, success) => {
   if (err) {
     console.error(
@@ -114,7 +114,7 @@ const sendPasswordResetEmail = async (userEmail, resetUrl) => {
         <h2>Password Reset Request</h2>
         <p>You requested to reset your password. Click the button below to set a new password:</p>
         <p>
-          <a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">
+          <a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#f97316;color:#ffffff;text-decoration:none;border-radius:6px;">
             Reset Password
           </a>
         </p>

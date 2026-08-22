@@ -1,13 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Order = require('../models/Order');
 const { protect, authorize } = require('../middleware/auth');
 const { uploadAvatar } = require('../middleware/upload');
 
 
 router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const count = await User.countDocuments();
+    const users = await User.find()
+      .select('-password')
+      .skip(skip)
+      .limit(limit);
     
     // Add full avatar URL to each user
     const usersWithAvatarUrl = users.map(user => {
@@ -22,6 +31,9 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
     
     res.json({
       success: true,
+      count,
+      page,
+      pages: Math.ceil(count / limit),
       users: usersWithAvatarUrl
     });
   } catch (error) {
@@ -97,6 +109,17 @@ router.put('/me', protect, async (req, res) => {
 
 router.put('/:id', protect, authorize('admin'), async (req, res) => {
   try {
+    if (req.body.isActive === false) {
+      const activeOrders = await Order.findOne({
+        user: req.params.id,
+        status: { $nin: ['delivered', 'cancelled', 'returned'] }
+      });
+      
+      if (activeOrders) {
+        return res.status(400).json({ message: 'Cannot deactivate account with active orders' });
+      }
+    }
+
     const user = await User.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
@@ -136,8 +159,47 @@ router.put('/me/avatar', protect, uploadAvatar.single('avatar'), async (req, res
 });
 
 
+router.delete('/me', protect, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ message: 'Admins cannot delete their own accounts' });
+    }
+
+    const activeOrders = await Order.findOne({
+      user: req.user._id,
+      status: { $nin: ['delivered', 'cancelled', 'returned'] }
+    });
+    
+    if (activeOrders) {
+      return res.status(400).json({ message: 'You cannot delete your account while you have active orders.' });
+    }
+
+    await User.findByIdAndDelete(req.user._id);
+    res.json({
+      success: true,
+      message: 'Your account has been deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
 router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   try {
+    if (req.user._id.toString() === req.params.id) {
+      return res.status(403).json({ message: 'Admins cannot delete their own accounts' });
+    }
+
+    const activeOrders = await Order.findOne({
+      user: req.params.id,
+      status: { $nin: ['delivered', 'cancelled', 'returned'] }
+    });
+    
+    if (activeOrders) {
+      return res.status(400).json({ message: 'Cannot delete account with active orders' });
+    }
+
     await User.findByIdAndDelete(req.params.id);
     res.json({
       success: true,

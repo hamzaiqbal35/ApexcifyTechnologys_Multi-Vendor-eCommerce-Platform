@@ -6,11 +6,11 @@ const {
   getOrder,
   updateOrder,
   cancelOrder,
+  requestReturn,
   updateOrderStatus,
   getAllOrders,
   updateOrderPaymentToggle,
-  fixOrderConsistency,
-  requestOrderCancellation
+  fixOrderConsistency
 } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/auth');
 const { validateUpdateOrder, validateCancelOrder } = require('../middleware/orderValidation');
@@ -19,15 +19,15 @@ router.use(protect);
 
 router.post('/', createOrder);
 router.get('/my-orders', getMyOrders);
-router.get('/all', authorize('admin', 'vendor'), getAllOrders);
+router.get('/all', authorize('admin'), getAllOrders);
 router.get('/:id', getOrder);
 
 router.put('/:id', validateUpdateOrder, updateOrder);
 router.put('/:id/cancel', validateCancelOrder, cancelOrder);
+router.put('/:id/return', requestReturn);
 
-router.put('/:id/status', authorize('admin', 'vendor'), updateOrderStatus);
-router.put('/:id/pay', authorize('admin', 'vendor'), updateOrderPaymentToggle);
-router.put('/:id/cancel-request', authorize('vendor'), requestOrderCancellation);
+router.put('/:id/status', authorize('admin'), updateOrderStatus);
+router.put('/:id/pay', authorize('admin'), updateOrderPaymentToggle);
 
 // Admin utility route to fix inconsistent orders
 router.put('/:id/fix-consistency', authorize('admin'), fixOrderConsistency);

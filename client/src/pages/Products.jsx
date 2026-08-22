@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import ProductCard from '../components/ProductCard';
+import { Search, ChevronLeft, ChevronRight, Loader2, Filter } from 'lucide-react';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,59 +63,63 @@ const Products = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">All Products</h1>
+    <div className="container mx-auto px-6 py-12 animate-fade-in min-h-screen">
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold tracking-tight text-black">Collection</h1>
+        <p className="text-gray-500 mt-2">Explore our premium selection of products.</p>
+      </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-12">
         {/* Filters Sidebar */}
-        <aside className="w-full md:w-64">
-          <div className="bg-white p-4 rounded-lg shadow-md">
-            <h2 className="font-semibold mb-4">Filters</h2>
-            
-            <div className="mb-4">
-              <label htmlFor="search-products" className="block text-sm font-medium mb-2">Search</label>
-              <input
-                id="search-products"
-                name="search"
-                type="text"
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                placeholder="Search products..."
-                className="w-full px-3 py-2 border rounded-md"
-                aria-label="Search products"
-              />
-            </div>
-
+        <aside className="w-full lg:w-64 shrink-0">
+          <div className="sticky top-24 space-y-8">
             <div>
-              {loadingCategories ? (
+              <div className="flex items-center gap-2 mb-4">
+                <Filter className="w-4 h-4 text-black" />
+                <h2 className="text-sm font-semibold text-black uppercase tracking-wider">Filters</h2>
+              </div>
+              
+              <div className="space-y-6">
                 <div>
-                  <div className="block text-sm font-medium mb-2">Category</div>
-                  <div className="w-full px-3 py-2 border rounded bg-gray-100 animate-pulse">
-                    Loading categories...
+                  <label htmlFor="search-products" className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      id="search-products"
+                      name="search"
+                      type="text"
+                      value={filters.search}
+                      onChange={(e) => handleFilterChange('search', e.target.value)}
+                      placeholder="Find a product..."
+                      className="w-full pl-9 pr-3 py-2 border border-border rounded-md focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm"
+                    />
                   </div>
                 </div>
-              ) : (
-                <>
-                  <label htmlFor="category-filter" className="block text-sm font-medium mb-2">
+
+                <div>
+                  <label htmlFor="category-filter" className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
                     Category
                   </label>
-                  <select
-                    id="category-filter"
-                    name="category"
-                    value={filters.category}
-                    onChange={(e) => handleFilterChange('category', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                    aria-label="Filter by category"
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map((cat) => (
-                      <option key={cat._id} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
+                  {loadingCategories ? (
+                    <div className="w-full h-9 bg-gray-100 rounded animate-pulse"></div>
+                  ) : (
+                    <select
+                      id="category-filter"
+                      name="category"
+                      value={filters.category}
+                      onChange={(e) => handleFilterChange('category', e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md focus:border-black focus:ring-1 focus:ring-black outline-none transition-all text-sm bg-white cursor-pointer"
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map((cat) => (
+                        <option key={cat._id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </aside>
@@ -122,10 +127,12 @@ const Products = () => {
         {/* Products Grid */}
         <main className="flex-1">
           {loading ? (
-            <div className="text-center py-12">Loading products...</div>
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-black" />
+            </div>
           ) : products.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                 {products.map((product) => (
                   <ProductCard key={product._id} product={product} />
                 ))}
@@ -133,29 +140,34 @@ const Products = () => {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="flex justify-center mt-8 space-x-2">
+                <div className="flex justify-center items-center mt-16 space-x-4 border-t border-border pt-8">
                   <button
                     onClick={() => handleFilterChange('page', filters.page - 1)}
                     disabled={filters.page === 1}
-                    className="px-4 py-2 border rounded disabled:opacity-50"
+                    className="p-2 border border-border rounded-md hover:border-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Previous
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <span className="px-4 py-2">
+                  <span className="text-sm font-medium text-gray-600">
                     Page {filters.page} of {pagination.totalPages}
                   </span>
                   <button
                     onClick={() => handleFilterChange('page', filters.page + 1)}
                     disabled={filters.page >= pagination.totalPages}
-                    className="px-4 py-2 border rounded disabled:opacity-50"
+                    className="p-2 border border-border rounded-md hover:border-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Next
+                    <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
               )}
             </>
           ) : (
-            <div className="text-center py-12 text-gray-500">No products found</div>
+            <div className="flex flex-col items-center justify-center h-64 border border-border rounded-xl bg-gray-50">
+              <p className="text-gray-500 font-medium">No products found matching your criteria.</p>
+              <button onClick={() => { setFilters({ search: '', category: '', page: 1 }); setSearchParams({}); }} className="mt-4 text-sm text-black underline underline-offset-4">
+                Clear Filters
+              </button>
+            </div>
           )}
         </main>
       </div>
@@ -164,4 +176,3 @@ const Products = () => {
 };
 
 export default Products;
-
