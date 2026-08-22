@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import api, { getMediaUrl } from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
@@ -204,8 +204,12 @@ const CheckoutForm = ({ cart, cartTotal, shippingPrice, taxRate, taxPrice, total
           <div className="space-y-4 mb-6 pb-6 border-b border-border">
             {cart.items.map((item) => (
               <div key={item._id} className="flex gap-4">
-                <div className="w-16 h-16 bg-gray-50 rounded-lg border border-border p-1 flex-shrink-0 flex items-center justify-center">
-                  <img src={item.product.images?.[0] || 'https://via.placeholder.com/150'} alt={item.product.name} className="w-full h-full object-contain mix-blend-multiply" />
+                <div className="w-16 h-16 bg-gray-50 rounded-lg border border-border p-1 flex-shrink-0 flex items-center justify-center relative overflow-hidden">
+                  {item.product.images?.[0] && item.product.images[0].match(/\.(mp4|webm|ogg)$/i) ? (
+                    <video src={getMediaUrl(item.product.images[0])} className="w-full h-full object-contain mix-blend-multiply" />
+                  ) : (
+                    <img src={getMediaUrl(item.product.images?.[0]) || 'https://via.placeholder.com/150'} alt={item.product.name} className="w-full h-full object-contain mix-blend-multiply" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-black truncate">{item.product.name}</p>

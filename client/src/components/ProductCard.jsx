@@ -2,8 +2,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
-import { ShoppingBag, Star } from 'lucide-react';
+import { ShoppingBag, Star, PlayCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
+
+const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+  return `${baseUrl}${path}`;
+};
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
@@ -38,11 +45,20 @@ const ProductCard = ({ product }) => {
   return (
     <div className="group flex flex-col bg-white border border-border rounded-lg overflow-hidden hover:border-black transition-colors duration-300">
       <Link to={`/products/${product._id}`} className="block relative aspect-square bg-gray-50 overflow-hidden">
-        <img
-          src={product.images?.[0] || 'https://via.placeholder.com/400'}
-          alt={product.name}
-          className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-105"
-        />
+        {product.images?.[0] && product.images[0].match(/\.(mp4|webm|ogg)$/i) ? (
+          <>
+            <video src={getMediaUrl(product.images[0])} className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-105" />
+            <div className="absolute top-3 right-3 bg-black/60 p-1 rounded text-white backdrop-blur-sm z-10">
+              <PlayCircle size={16} />
+            </div>
+          </>
+        ) : (
+          <img
+            src={getMediaUrl(product.images?.[0]) || 'https://via.placeholder.com/400'}
+            alt={product.name}
+            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-105"
+          />
+        )}
         
         {/* Status Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">

@@ -6,7 +6,7 @@ const Product = require('../models/Product');
 const getProducts = async (req, res) => {
   try {
     const { category, search, page = 1, limit = 12 } = req.query;
-    const query = { isActive: true };
+    const query = { isActive: true, isDeleted: { $ne: true } };
 
     if (category) query.category = category;
     if (search) {
@@ -41,7 +41,7 @@ const getProducts = async (req, res) => {
 const getAllProductsAdmin = async (req, res) => {
   try {
     const { category, search, page = 1, limit = 12 } = req.query;
-    const query = {}; // No isActive filter for admin
+    const query = { isDeleted: { $ne: true } }; // Exclude soft-deleted products, allow older ones
 
     if (category) query.category = category;
     if (search) {
@@ -130,11 +130,27 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // ADMIN FULL UPDATE
-    product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    // Check if status is being toggled and if there's a reason
+    if (req.body.isActive !== undefined && req.body.isActive !== product.isActive) {
+      if (!req.body.reason && !req.body.isActive) {
+        return res.status(400).json({ message: 'Reason is required when deactivating a product' });
+      }
+      if (req.body.reason) {
+        product.actionLogs.push({
+          action: req.body.isActive ? 'activate' : 'deactivate',
+          reason: req.body.reason,
+          user: req.user._id
+        });
+      }
+    }
+
+    // Remove reason from body so it doesn't get saved as a product field
+    const updateData = { ...req.body };
+    delete updateData.reason;
+
+    // Use Object.assign instead of findByIdAndUpdate to trigger hooks if any, and keep the pushed logs
+    Object.assign(product, updateData);
+    await product.save();
 
     res.json({
       success: true,
@@ -145,11 +161,17 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// @desc    Delete product
+// @desc    Delete product (Soft Delete)
 // @route   DELETE /api/products/:id
 // @access  Private (Admin)
 const deleteProduct = async (req, res) => {
   try {
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Reason is required for deletion' });
+    }
+
     const product = await Product.findById(req.params.id);
 
     if (!product) {
@@ -159,10 +181,15 @@ const deleteProduct = async (req, res) => {
       });
     }
 
+    product.isDeleted = true;
+    product.isActive = false;
+    product.actionLogs.push({
+      action: 'delete',
+      reason: reason,
+      user: req.user._id
+    });
 
-
-    // Use deleteOne() instead of remove()
-    await Product.deleteOne({ _id: product._id });
+    await product.save();
 
     res.json({
       success: true,
@@ -175,6 +202,53 @@ const deleteProduct = async (req, res) => {
       message: 'Server error',
       error: error.message 
     });
+  }
+};
+
+// @desc    Manage product stock
+// @route   PUT /api/products/:id/stock
+// @access  Private (Admin)
+const manageStock = async (req, res) => {
+  try {
+    const { action, quantity, reason } = req.body;
+    
+    if (!action || !['add', 'remove'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Valid action (add/remove) is required' });
+    }
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid quantity is required' });
+    }
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Reason is required' });
+    }
+
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    if (action === 'remove' && product.stock < quantity) {
+      return res.status(400).json({ success: false, message: 'Not enough stock to remove' });
+    }
+
+    product.stock = action === 'add' ? product.stock + Number(quantity) : product.stock - Number(quantity);
+    
+    product.actionLogs.push({
+      action: action === 'add' ? 'add_stock' : 'remove_stock',
+      reason: reason,
+      quantityChanged: quantity,
+      user: req.user._id
+    });
+
+    await product.save();
+
+    res.json({
+      success: true,
+      message: 'Stock updated successfully',
+      product
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -245,6 +319,7 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  manageStock,
   addReview,
   uploadImages
 };

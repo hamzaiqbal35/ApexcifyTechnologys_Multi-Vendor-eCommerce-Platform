@@ -129,12 +129,17 @@ const createOrder = async (req, res) => {
     const taxPrice = itemsPrice * taxRate;
     const totalPrice = itemsPrice + shippingPrice + taxPrice;
 
+    const isPaid = !!req.body.stripePaymentIntentId;
+    const paidAt = isPaid ? new Date() : undefined;
+
     const [order] = await Order.create([{
       user: req.user._id,
       orderItems,
       shippingAddress,
       paymentMethod,
       stripePaymentIntentId: req.body.stripePaymentIntentId, // Handle stripe
+      isPaid,
+      paidAt,
       itemsPrice,
       shippingPrice,
       taxPrice,

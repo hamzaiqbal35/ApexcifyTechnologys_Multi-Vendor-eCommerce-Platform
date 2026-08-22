@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import api, { getMediaUrl } from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
@@ -9,16 +9,45 @@ import Swal from 'sweetalert2';
 
 const Cart = () => {
   const { cart, loading, updateCartItem, removeFromCart, cartTotal } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [shippingPrice, setShippingPrice] = useState(10);
+  const [taxRate, setTaxRate] = useState(0.1);
+
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       navigate('/login');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authLoading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        const settings = res.data.data;
+        if (settings) {
+          if (settings.shipping) {
+            if (settings.shipping.isTiered && cartTotal >= settings.shipping.freeShippingThreshold) {
+              setShippingPrice(0);
+            } else {
+              setShippingPrice(settings.shipping.flatRate);
+            }
+          }
+          if (settings.tax && settings.tax.rate !== undefined) {
+            setTaxRate(settings.tax.rate / 100);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch shipping settings:', error);
+      }
+    };
+    if (cartTotal > 0) {
+      fetchSettings();
+    }
+  }, [cartTotal]);
+
+  if (loading || authLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-pulse text-gray-400 font-medium tracking-widest uppercase text-sm">Loading Cart...</div>
@@ -63,35 +92,6 @@ const Cart = () => {
     }
   };
 
-  const [shippingPrice, setShippingPrice] = useState(10);
-  const [taxRate, setTaxRate] = useState(0.1);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await api.get('/settings');
-        const settings = res.data.data;
-        if (settings) {
-          if (settings.shipping) {
-            if (settings.shipping.isTiered && cartTotal >= settings.shipping.freeShippingThreshold) {
-              setShippingPrice(0);
-            } else {
-              setShippingPrice(settings.shipping.flatRate);
-            }
-          }
-          if (settings.tax && settings.tax.rate !== undefined) {
-            setTaxRate(settings.tax.rate / 100);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch shipping settings:', error);
-      }
-    };
-    if (cartTotal > 0) {
-      fetchSettings();
-    }
-  }, [cartTotal]);
-
   const taxPrice = cartTotal * taxRate;
   const totalPrice = cartTotal + shippingPrice + taxPrice;
 
@@ -108,12 +108,16 @@ const Cart = () => {
               return (
                 <div key={item._id} className="py-8 border-b border-border flex flex-col sm:flex-row gap-6 group">
                   <Link to={`/products/${product._id}`} className="shrink-0">
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-50 border border-border rounded-xl overflow-hidden flex items-center justify-center p-2">
-                      <img
-                        src={product.images?.[0] || 'https://via.placeholder.com/150'}
-                        alt={product.name}
-                        className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105"
-                      />
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-50 border border-border rounded-xl overflow-hidden flex items-center justify-center p-2 relative">
+                      {product.images?.[0] && product.images[0].match(/\.(mp4|webm|ogg)$/i) ? (
+                        <video src={getMediaUrl(product.images[0])} className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105" />
+                      ) : (
+                        <img
+                          src={getMediaUrl(product.images?.[0]) || 'https://via.placeholder.com/150'}
+                          alt={product.name}
+                          className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105"
+                        />
+                      )}
                     </div>
                   </Link>
                   

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import api, { getMediaUrl } from '../utils/api';
 import { formatPricePKR } from '../utils/currency';
 import { ArrowLeft, Edit2, X, Check, Truck, CreditCard, MapPin, Loader2, XCircle, RefreshCw } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -180,8 +180,12 @@ const OrderDetails = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-10 animate-fade-in">
       <div className="container mx-auto px-6 max-w-6xl">
-        {isCustomer && (
+        {isCustomer ? (
           <button onClick={() => navigate('/orders')} className="mb-8 text-sm font-medium text-gray-500 hover:text-black flex items-center transition-colors">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Orders
+          </button>
+        ) : (
+          <button onClick={() => navigate('/admin/dashboard', { state: { tab: 'orders' } })} className="mb-8 text-sm font-medium text-gray-500 hover:text-black flex items-center transition-colors">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Orders
           </button>
         )}
@@ -272,8 +276,12 @@ const OrderDetails = () => {
                   {(editingItems ? updatedItems : order.orderItems).map((item, idx) => (
                     <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 p-4 rounded-xl border border-border gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-white rounded-lg border border-border p-1">
-                          <img src={item.image || 'https://via.placeholder.com/100'} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                        <div className="w-16 h-16 bg-white rounded-lg border border-border p-1 relative overflow-hidden">
+                          {item.image && item.image.match(/\.(mp4|webm|ogg)$/i) ? (
+                            <video src={getMediaUrl(item.image)} className="w-full h-full object-contain mix-blend-multiply" />
+                          ) : (
+                            <img src={getMediaUrl(item.image) || 'https://via.placeholder.com/100'} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                          )}
                         </div>
                         <div>
                           <p className="font-semibold text-black text-sm">{item.name}</p>

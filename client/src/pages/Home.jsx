@@ -4,6 +4,13 @@ import api from '../utils/api';
 import ProductCard from '../components/ProductCard';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
+const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+  return `${baseUrl}${path}`;
+};
+
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +71,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       {/* Hero Section */}
-      <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden border-b border-border bg-gray-50">
+      <section className="relative h-[60vh] min-h-[400px] md:h-[70vh] md:min-h-[500px] flex items-center justify-center overflow-hidden border-b border-border bg-gray-50">
         {activeSlides.map((slide, index) => (
           <div
             key={index}
@@ -72,10 +79,10 @@ const Home = () => {
               index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
           >
-            <div className="container mx-auto px-6 text-center max-w-4xl relative z-20">
+            <div className="container mx-auto px-12 md:px-20 lg:px-6 text-center max-w-4xl relative z-20">
               {slide.title && (
                 <h1 
-                  className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-tight"
+                  className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tighter mb-4 md:mb-6 leading-tight"
                   style={{ color: slide.textColor || '#000000' }}
                 >
                   {slide.title}
@@ -83,7 +90,7 @@ const Home = () => {
               )}
               {slide.subtitle && (
                 <p 
-                  className="text-lg md:text-xl mb-10 max-w-2xl mx-auto font-light"
+                  className="text-base md:text-lg lg:text-xl mb-8 md:mb-10 max-w-2xl mx-auto font-light"
                   style={{ color: slide.textColor || '#4b5563' }}
                 >
                   {slide.subtitle}
@@ -102,7 +109,7 @@ const Home = () => {
             {/* Display Banner Image if exists, else abstract bg */}
             {slide.imageUrl ? (
               <div className="absolute inset-0 overflow-hidden pointer-events-none flex items-center justify-center bg-gray-100">
-                <img src={`${import.meta.env.VITE_SERVER_URL}${slide.imageUrl}`} alt={slide.title || 'Banner'} className="w-full h-full object-cover object-center" />
+                <img src={getMediaUrl(slide.imageUrl)} alt={slide.title || 'Banner'} className="w-full h-full object-cover object-[80%_center] md:object-center" />
                 {(slide.title || slide.subtitle) && (
                   <div className="absolute inset-0 bg-black/30 md:bg-black/10"></div>
                 )}
@@ -129,17 +136,17 @@ const Home = () => {
             />
           ))}
         </div>
-        {/* Navigation Arrows */}
+        {/* Navigation Arrows (Hidden on mobile to save space) */}
         <button
           onClick={() => setCurrentSlide((prev) => (prev - 1 + activeSlides.length) % activeSlides.length)}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md"
+          className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md items-center justify-center"
           aria-label="Previous slide"
         >
           <ChevronLeft className="w-8 h-8 text-black" />
         </button>
         <button
           onClick={() => setCurrentSlide((prev) => (prev + 1) % activeSlides.length)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md"
+          className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-white/80 hover:bg-white transition-colors shadow-md items-center justify-center"
           aria-label="Next slide"
         >
           <ChevronRight className="w-8 h-8 text-black" />

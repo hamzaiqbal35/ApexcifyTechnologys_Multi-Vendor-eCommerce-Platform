@@ -4,8 +4,15 @@ import api from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
-import { Star, Minus, Plus, Loader2, ArrowLeft } from 'lucide-react';
+import { Star, Minus, Plus, Loader2, ArrowLeft, PlayCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
+
+const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+  return `${baseUrl}${path}`;
+};
 
 const ProductDetails = () => {
   const { id } = useParams();
@@ -92,26 +99,48 @@ const ProductDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
           {/* Product Images */}
           <div className="space-y-4">
-            <div className="aspect-square bg-gray-50 border border-border rounded-2xl overflow-hidden flex items-center justify-center p-8">
-              <img
-                src={product.images?.[activeImage] || 'https://via.placeholder.com/600'}
-                alt={product.name}
-                className="max-w-full max-h-full object-contain mix-blend-multiply"
-              />
+            <div className="aspect-square bg-gray-50 border border-border rounded-2xl overflow-hidden flex items-center justify-center p-8 relative">
+              {product.images?.[activeImage] && product.images[activeImage].match(/\.(mp4|webm|ogg)$/i) ? (
+                <video
+                  src={getMediaUrl(product.images[activeImage])}
+                  controls
+                  autoPlay
+                  className="max-w-full max-h-full object-contain"
+                />
+              ) : (
+                <img
+                  src={getMediaUrl(product.images?.[activeImage]) || 'https://via.placeholder.com/600'}
+                  alt={product.name}
+                  className="max-w-full max-h-full object-contain mix-blend-multiply"
+                />
+              )}
             </div>
             {product.images?.length > 1 && (
               <div className="grid grid-cols-4 gap-4">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImage(idx)}
-                    className={`aspect-square bg-gray-50 border rounded-xl overflow-hidden transition-all ${
-                      activeImage === idx ? 'border-black ring-1 ring-black' : 'border-border hover:border-gray-400'
-                    }`}
-                  >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover mix-blend-multiply p-2" />
-                  </button>
-                ))}
+                {product.images.map((img, idx) => {
+                  const isVideo = img.match(/\.(mp4|webm|ogg)$/i);
+                  const mediaSrc = getMediaUrl(img);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveImage(idx)}
+                      className={`relative aspect-square bg-gray-50 border rounded-xl overflow-hidden transition-all ${
+                        activeImage === idx ? 'border-black ring-1 ring-black' : 'border-border hover:border-gray-400'
+                      }`}
+                    >
+                      {isVideo ? (
+                        <>
+                          <video src={mediaSrc} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <PlayCircle className="text-white w-6 h-6" />
+                          </div>
+                        </>
+                      ) : (
+                        <img src={mediaSrc} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover mix-blend-multiply p-2" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

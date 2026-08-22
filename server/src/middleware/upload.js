@@ -35,6 +35,13 @@ const productStorage = multer.diskStorage({
   }
 });
 
+const mediaFileFilter = (req, file, cb) => {
+  if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+    return cb(new Error('Only image and video files are allowed'), false);
+  }
+  cb(null, true);
+};
+
 const imageFileFilter = (req, file, cb) => {
   if (!file.mimetype.startsWith('image/')) {
     return cb(new Error('Only image files are allowed'), false);
@@ -48,11 +55,11 @@ const uploadAvatar = multer({
   limits: { fileSize: 2 * 1024 * 1024 } // 2MB
 });
 
-// Upload for product images - allows up to 5 images
+// Upload for product media - allows up to 10 files
 const uploadProductImages = multer({
   storage: productStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB per image
+  fileFilter: mediaFileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB per file
 });
 
 module.exports = {

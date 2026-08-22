@@ -7,6 +7,7 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  manageStock,
   addReview,
   uploadImages
 } = require('../controllers/productController');
@@ -34,7 +35,7 @@ router.post(
   '/upload-images',
   protect,
   authorize('admin'),
-  uploadProductImages.array('images', 5),
+  uploadProductImages.array('images', 10),
   uploadImages
 );
 
@@ -55,6 +56,14 @@ router.delete(
   protect,
   authorize('admin'),
   deleteProduct
+);
+
+// Manage product stock (admin)
+router.put(
+  '/:id/stock',
+  protect,
+  authorize('admin'),
+  manageStock
 );
 
 module.exports = router;

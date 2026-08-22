@@ -9,6 +9,7 @@
 [![Node.js](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB)](https://expressjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=Stripe&logoColor=white)](https://stripe.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
@@ -48,9 +49,11 @@ Whether you are a customer looking for products, a vendor managing an inventory,
 
 ### 🛒 For Customers
 - **Seamless Shopping**: Browse products from multiple vendors in one place.
-- **Smart Cart**: Persistent shopping cart with guest checkout options.
+- **Dynamic Media Support**: Robust product pages supporting both images and `.mp4/.webm` videos for richer product presentations.
+- **Smart Cart**: Persistent shopping cart with guest checkout options and dynamic shipping/tax calculations.
 - **Secure Reviews**: Verified purchase reviews and 5-star rating system.
-- **Order Tracking**: Real-time updates on order status (Pending, Processing, Shipped, Delivered).
+- **Order Tracking**: Real-time updates on order status (Pending, Processing, Shipped, Delivered) and tracking details.
+- **Stripe Payments**: Integrated with Stripe for secure credit/debit card transactions.
 
 ### 🏪 For Vendors
 - **Dashboard**: Specialized panel to manage products, inventory, and sales.
@@ -58,14 +61,15 @@ Whether you are a customer looking for products, a vendor managing an inventory,
 - **Split Orders**: Multi-vendor order support handles split payments and shipping automatically.
 
 ### 🛡️ For Administrators
-- **Platform Oversight**: Comprehensive dashboard for monitoring users, products, and orders.
+- **Platform Oversight**: Comprehensive dashboard for monitoring users, products, and orders with detailed Recharts analytics.
 - **User Management**: Tools to suspend, ban, or verify users and vendors.
-- **System Stats**: Real-time analytics on platform performance.
+- **Dynamic Categories**: Admin-controlled dynamic product categories that automatically populate the vendor dashboards.
+- **Store Settings**: Fully manageable shipping and tax configurations straight from the dashboard.
 
 ### 🔐 Security & Core
 - **Authentication**: Secure JWT-based auth with role-based access control (RBAC).
-- **Data Integrity**: Robust input validation and secure database transactions.
-- **Responsive**: Mobile-first design ensures compatibility across all devices.
+- **Data Integrity**: Robust input validation (express-validator) and secure database transactions.
+- **Responsive**: Mobile-first design ensures compatibility across all devices using TailwindCSS.
 
 ---
 
@@ -78,7 +82,10 @@ Whether you are a customer looking for products, a vendor managing an inventory,
 | **Vite** | Next-generation frontend tooling for lightning-fast builds. |
 | **Tailwind CSS** | Utility-first CSS framework for rapid UI development. |
 | **Recharts** | Composable charting library for dashboard analytics. |
+| **Stripe React** | Secure checkout elements for processing payments. |
+| **Lucide React** | Modern SVG icons. |
 | **Axios** | Promise-based HTTP client for API requests. |
+| **SweetAlert2 & Toastify** | Beautiful, responsive, customizable popups and toast notifications. |
 
 ### Backend API
 | Tech | Description |
@@ -87,8 +94,10 @@ Whether you are a customer looking for products, a vendor managing an inventory,
 | **Express.js** | Minimalist web framework for Node.js. |
 | **MongoDB** | NoSQL database for flexible data schemas. |
 | **Mongoose** | ODM library for MongoDB and Node.js. |
-| **Multer / Cloudinary** | Handling file uploads and cloud storage. |
+| **Stripe** | Backend payment intent creation and management. |
+| **Multer / Cloudinary** | Handling local file uploads and scalable cloud storage for images/videos. |
 | **Nodemailer** | Module for sending transactional emails. |
+| **BcryptJS & JWT** | Password hashing and secure authentication tokens. |
 
 ---
 
@@ -101,15 +110,15 @@ root/
 │   │   ├── components/     # Reusable UI blocks
 │   │   ├── context/        # Context Providers (Auth, Cart, etc.)
 │   │   ├── pages/          # Application Routes/Views
-│   │   └── utils/          # Helpers & Constants
+│   │   └── utils/          # Helpers (API config, currency formatter, getMediaUrl)
 │   └── ...
 │
 ├── server/                 # ⚙️ Backend (Node + Express)
 │   ├── src/
 │   │   ├── config/         # Environment & DB Configs
 │   │   ├── controllers/    # Request Handlers
-│   │   ├── middleware/     # Auth & Validation Middleware
-│   │   ├── models/         # Mongoose Schemas
+│   │   ├── middleware/     # Auth (JWT) & Validation Middleware
+│   │   ├── models/         # Mongoose Schemas (User, Product, Order, etc.)
 │   │   └── routes/         # API Endpoint Definitions
 │   └── ...
 │
@@ -128,6 +137,7 @@ Ensure you have the following installed:
 - **Node.js** (v18+)
 - **npm** (v9+) or **yarn**
 - **MongoDB** (Local instance or Atlas URI)
+- **Stripe Account** (for payment processing)
 
 ### Installation
 
@@ -156,6 +166,13 @@ Ensure you have the following installed:
     PORT=5000
     MONGO_URI=your_mongodb_connection_string
     JWT_SECRET=your_jwt_secret
+    STRIPE_SECRET_KEY=your_stripe_secret_key
+    ```
+
+    **Client `.env` example:**
+    ```env
+    VITE_API_URL=http://localhost:5000/api
+    VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
     ```
 
 4.  **Launch Development Servers**
@@ -189,11 +206,15 @@ Ensure you have the following installed:
 ### Products
 - `GET /api/products` - List all products with pagination/filtering
 - `GET /api/products/:id` - Get product details
-- `POST /api/products` - (Vendor) Create new product
-- `PUT /api/products/:id` - (Vendor) Update product details
+- `POST /api/products` - (Vendor/Admin) Create new product (supports multi-image & video upload)
+- `PUT /api/products/:id` - (Vendor/Admin) Update product details
+
+### Categories
+- `GET /api/categories` - Fetch active categories
+- `POST /api/categories` - (Admin) Create a category
 
 ### Orders
-- `POST /api/orders` - Place a new order
+- `POST /api/orders` - Place a new order with Stripe Intent
 - `GET /api/orders/my-orders` - History of customer orders
 - `GET /api/orders/all` - (Vendor/Admin) View all relevant orders
 - `PUT /api/orders/:id/status` - (Vendor/Admin) Update order fulfillment status
@@ -204,11 +225,10 @@ Ensure you have the following installed:
 
 ## 🛣️ Future Roadmap
 
-- [ ] 💳 **Online Payment Integration** - Secure payment gateway processing.
 - [ ] 🔍 **Advanced Search** - ElasticSearch integration for better discovery.
 - [ ] ❤️ **Wishlist** - Save items for later.
-- [ ] 📊 **Vendor Analytics** - Detailed sales graphs and reports.
-- [ ] 🔔 **Real-time Notifications** - Socket.io integration for instant updates.
+- [ ] 📊 **Vendor Analytics** - Detailed sales graphs and reports specific to individual vendors.
+- [ ] 🔔 **Real-time Notifications** - Socket.io integration for instant updates on order status.
 - [ ] 🌐 **Localization** - Multi-language support (i18n).
 
 ---

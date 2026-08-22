@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../utils/api';
+import api, { getMediaUrl } from '../utils/api';
 import { formatPricePKR } from '../utils/currency';
 import { Package, ArrowRight } from 'lucide-react';
 
@@ -76,7 +76,7 @@ const Orders = () => {
                     <div className="flex -space-x-4">
                       {order.orderItems.slice(0, 4).map((item, idx) => (
                         <div key={idx} className="w-14 h-14 rounded-full border-2 border-white bg-gray-50 flex items-center justify-center p-1 z-10 relative group-hover:-translate-y-1 transition-transform" style={{ transitionDelay: `${idx * 50}ms` }}>
-                          <img src={item.image || 'https://via.placeholder.com/100'} alt={item.name} className="w-full h-full object-contain mix-blend-multiply rounded-full" />
+                          <img src={getMediaUrl(item.image) || 'https://via.placeholder.com/100'} alt={item.name} className="w-full h-full object-contain mix-blend-multiply rounded-full" />
                         </div>
                       ))}
                       {order.orderItems.length > 4 && (
@@ -110,14 +110,14 @@ const Orders = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4 w-full lg:w-auto">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
                     {order.trackingNumber && (
-                      <div className="flex-1 lg:flex-none px-4 py-2 bg-gray-50 rounded-lg border border-border text-sm">
+                      <div className="flex-1 lg:flex-none px-4 py-2 bg-gray-50 rounded-lg border border-border text-sm text-center sm:text-left">
                         <span className="text-gray-500 mr-2">Track:</span>
-                        <span className="font-mono font-medium text-black">{order.trackingNumber}</span>
+                        <span className="font-mono font-medium text-black break-all">{order.trackingNumber}</span>
                       </div>
                     )}
-                    <Link to={`/orders/${order._id}`} className="btn-secondary whitespace-nowrap lg:px-8">
+                    <Link to={`/orders/${order._id}`} className="btn-secondary whitespace-nowrap lg:px-8 text-center w-full sm:w-auto">
                       View Details
                     </Link>
                   </div>

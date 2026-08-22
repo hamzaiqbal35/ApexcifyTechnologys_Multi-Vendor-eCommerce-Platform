@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../utils/api';
@@ -18,9 +18,11 @@ import {
   AreaChart, Area, ComposedChart, ScatterChart, Scatter, RadarChart, Radar,
   Treemap, Brush, ReferenceLine, ReferenceDot, ReferenceArea
 } from 'recharts';
+import AdminProductsTab from '../components/AdminProductsTab';
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'overview');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -185,31 +187,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleToggleProductStatus = async (productId, currentStatus) => {
-    try {
-      await api.put(`/products/${productId}`, { isActive: !currentStatus });
-      toast.success(`Product has been ${currentStatus ? 'deactivated' : 'activated'} successfully`);
-      fetchProducts();
-    } catch (error) {
-      console.error('Error toggling product status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update product status');
-    }
-  };
-
-  const handleDeleteProduct = async (productId) => {
-    const confirmResult = window.confirm('Are you sure you want to delete this product? This action is permanent and cannot be undone.');
-    if (!confirmResult) return;
-
-    try {
-      await api.delete(`/products/${productId}`);
-      toast.success('Product deleted successfully');
-      fetchProducts();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete product');
-    }
-  };
-
   const handleUpdateOrderStatus = async (orderId, status, shippingDetails = null) => {
     try {
       const payload = { status };
@@ -275,8 +252,8 @@ const AdminDashboard = () => {
         <div className="container mx-auto px-4 py-6">
           {/* Tabs */}
           <div className="bg-brand-white rounded-lg shadow-sm mb-6 overflow-hidden border border-border">
-            <div className="flex p-1.5 bg-muted">
-              <div className="flex space-x-2.5 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="flex p-1.5 bg-muted w-full">
+              <div className="flex space-x-2.5 overflow-x-auto pb-1 scrollbar-hide w-full flex-nowrap">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -323,12 +300,11 @@ const AdminDashboard = () => {
                   />
                 )}
                 {activeTab === 'products' && (
-                  <ProductsTab
+                  <AdminProductsTab
                     products={products}
-                    onToggleStatus={handleToggleProductStatus}
-                    onDelete={handleDeleteProduct}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
+                    refreshProducts={fetchProducts}
                   />
                 )}
                 {activeTab === 'orders' && (
@@ -439,7 +415,7 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold">User Management</h2>
         <div className="relative">
           <label htmlFor="user-search" className="sr-only">Search users</label>
@@ -450,7 +426,7 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
             placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+            className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search users"
           />
         </div>
@@ -535,81 +511,6 @@ const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange 
   );
 };
 
-// Products Tab Component
-const ProductsTab = ({ products, onToggleStatus, onDelete, searchTerm, onSearchChange }) => {
-  const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Product Management</h2>
-        <div className="relative">
-          <label htmlFor="product-search" className="sr-only">Search products</label>
-          <input
-            id="product-search"
-            name="productSearch"
-            type="search"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
-            aria-label="Search products"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4">
-        {filteredProducts.map((product) => (
-          <div key={product._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-start space-x-4">
-              <img
-                src={product.images?.[0] || 'https://via.placeholder.com/100'}
-                alt={product.name}
-                className="w-20 h-20 object-cover rounded"
-              />
-              <div className="flex-1">
-                <h4 className="font-semibold text-lg">{product.name}</h4>
-                <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
-                <div className="flex items-center space-x-4 mt-2">
-                  <span className="text-brand-orange font-bold">{formatPricePKR(product.price)}</span>
-                  <span className="text-sm text-gray-600">Stock: {product.stock}</span>
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                    {product.category}
-                  </span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${product.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                    {product.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => onToggleStatus(product._id, product.isActive)}
-                  className={`px-3 py-1 rounded text-sm ${product.isActive
-                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                    : 'bg-green-100 text-green-800 hover:bg-green-200'
-                    }`}
-                >
-                  {product.isActive ? 'Deactivate' : 'Activate'}
-                </button>
-                <button
-                  onClick={() => onDelete(product._id)}
-                  className="px-3 py-1 bg-red-100 text-red-800 rounded text-sm hover:bg-red-200"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 // Orders Tab Component
 const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onTogglePayment }) => {
   const [shippingModal, setShippingModal] = useState({ isOpen: false, orderId: null });
@@ -652,7 +553,7 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold">Order Management</h2>
         <div className="relative">
           <label htmlFor="order-search" className="sr-only">Search orders</label>
@@ -663,7 +564,7 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
             placeholder="Search orders..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
+            className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             aria-label="Search orders"
           />
         </div>
@@ -723,8 +624,8 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
       <div className="space-y-4">
         {filteredOrders.map((order) => (
           <div key={order._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div>
+            <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-4 gap-4">
+              <div className="w-full">
                 <Link to={`/orders/${order._id}`} className="font-semibold text-brand-orange hover:underline">
                   Order #{order._id.slice(-8)}
                 </Link>
@@ -757,8 +658,8 @@ const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onToggl
                 )}
               </div>
 
-              <div className="flex flex-col items-end space-y-2">
-                <div className="flex items-center space-x-3">
+              <div className="flex flex-col items-start md:items-end space-y-2 w-full md:w-auto mt-4 md:mt-0">
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                   <select
                     value={order.status}
                     onChange={(e) => handleStatusChange(order._id, e.target.value)}
@@ -1062,9 +963,9 @@ const CategoriesTab = () => {
         ) : (
           <div className="divide-y divide-gray-200">
             {categories.map((category) => (
-              <div key={category._id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
+              <div key={category._id} className="p-4 hover:bg-gray-50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                  <div className="flex items-center">
+                  <div className="flex items-center flex-wrap gap-2">
                     <span className={`font-medium ${!category.isActive ? 'text-gray-400' : 'text-gray-900'}`}>
                       {category.name}
                     </span>
@@ -1078,7 +979,7 @@ const CategoriesTab = () => {
                     <p className="text-sm text-gray-500 mt-1">{category.description}</p>
                   )}
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => toggleCategoryStatus(category)}
                     className={`px-3 py-1 text-sm rounded-md ${category.isActive
@@ -1306,7 +1207,7 @@ const ReportsTab = ({ orders, products, users }) => {
           </div>
 
           {/* Chart Tabs */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 min-w-0">
             <div className="flex border-b mb-4">
               <button
                 className={`px-4 py-2 font-medium ${activeChart === 'sales' ? 'border-b-2 border-brand-orange text-brand-orange' : 'text-gray-500'}`}
@@ -1322,16 +1223,15 @@ const ReportsTab = ({ orders, products, users }) => {
               </button>
             </div>
 
-            <div className="h-80">
+            <div>
               {activeChart === 'sales' && (
-                <div className="h-full">
+                <div>
                   <h3 className="text-lg font-medium mb-4">Sales Trend</h3>
                   {salesDates.length > 0 ? (
-                    <div className="h-64">
-                      <LineChart
-                        width="100%"
-                        height="100%"
-                        data={sales.salesTrend || salesDates.map((date, i) => ({
+                    <div className="h-64 w-full min-w-0">
+                      <ResponsiveContainer width="99%" height="100%">
+                        <LineChart
+                          data={sales.salesTrend || salesDates.map((date, i) => ({
                           date,
                           sales: salesData[i] || 0
                         }))}
@@ -1349,10 +1249,11 @@ const ReportsTab = ({ orders, products, users }) => {
                           strokeWidth={2}
                           dot={false}
                         />
-                      </LineChart>
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="flex items-center justify-center h-64 text-gray-500">
                       No sales data available for the selected date range
                     </div>
                   )}
@@ -1360,18 +1261,17 @@ const ReportsTab = ({ orders, products, users }) => {
               )}
 
               {activeChart === 'products' && (
-                <div className="h-full">
+                <div>
                   <h3 className="text-lg font-medium mb-4">Top Selling Products</h3>
                   {loading ? (
-                    <div className="flex items-center justify-center h-full">
+                    <div className="flex items-center justify-center h-64">
                       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-orange"></div>
                     </div>
                   ) : topProducts && topProducts.length > 0 ? (
-                    <div className="h-64">
-                      <BarChart
-                        width="100%"
-                        height="100%"
-                        data={topProducts.map(product => {
+                    <div className="h-[400px] sm:h-80 w-full min-w-0">
+                      <ResponsiveContainer width="99%" height="100%">
+                        <BarChart
+                          data={topProducts.map(product => {
                           // Ensure we have numeric values for the chart
                           const quantitySold = Number(product.quantitySold || product.totalQuantity || 0);
                           const price = Number(product.price || 0);
@@ -1399,8 +1299,8 @@ const ReportsTab = ({ orders, products, users }) => {
                         <YAxis
                           type="category"
                           dataKey="displayName"
-                          width={200}
-                          tick={{ fontSize: 12 }}
+                          width={110}
+                          tick={{ fontSize: 11 }}
                         />
                         <Tooltip
                           labelFormatter={(label) => `Product: ${label}`}
@@ -1483,10 +1383,11 @@ const ReportsTab = ({ orders, products, users }) => {
                           radius={[0, 4, 4, 0]}
                           barSize={20}
                         />
-                      </BarChart>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4 text-center">
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-500 p-4 text-center">
                       <svg className="w-12 h-12 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>

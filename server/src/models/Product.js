@@ -65,6 +65,29 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  actionLogs: [{
+    action: { 
+      type: String, 
+      enum: ['deactivate', 'delete', 'add_stock', 'remove_stock'] 
+    },
+    reason: { 
+      type: String, 
+      required: true 
+    },
+    quantityChanged: Number,
+    date: { 
+      type: Date, 
+      default: Date.now 
+    },
+    user: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'User' 
+    }
+  }],
   tags: [String]
 }, {
   timestamps: true
