@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import ProductCard from '../components/ProductCard';
+import { Helmet } from 'react-helmet-async';
 import { Search, ChevronLeft, ChevronRight, Loader2, Filter } from 'lucide-react';
 
 const Products = () => {
@@ -64,6 +65,10 @@ const Products = () => {
 
   return (
     <div className="container mx-auto px-6 py-12 animate-fade-in min-h-screen">
+      <Helmet>
+        <title>{filters.category ? `${filters.category} Products` : 'All Products'} | Fluxmart</title>
+        <meta name="description" content={`Explore our premium selection of ${filters.category || 'all'} products.`} />
+      </Helmet>
       <div className="mb-10">
         <h1 className="text-4xl font-bold tracking-tight text-black">Collection</h1>
         <p className="text-gray-500 mt-2">Explore our premium selection of products.</p>

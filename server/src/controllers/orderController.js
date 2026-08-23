@@ -179,11 +179,29 @@ const createOrder = async (req, res) => {
 // @access  Private
 const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    let query = { user: req.user._id };
+    
+    if (req.query.status && req.query.status !== 'all') {
+      query.status = req.query.status;
+    }
+
+    const count = await Order.countDocuments(query);
+    
+    const orders = await Order.find(query)
       .populate('orderItems.product', 'name images')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       success: true,
+      count,
+      page,
+      pages: Math.ceil(count / limit),
       orders
     });
   } catch (error) {
@@ -592,7 +610,21 @@ const getAllOrders = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
+    const search = req.query.search;
+    const status = req.query.status;
+
     let query = {};
+    
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // For search, check if it's a valid ObjectId (since order ID search is common)
+    if (search) {
+      if (search.length === 24) {
+        query._id = search;
+      }
+    }
     const count = await Order.countDocuments(query);
 
     const orders = await Order.find(query)

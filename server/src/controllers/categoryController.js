@@ -6,7 +6,11 @@ const Category = require('../models/Category');
 // @access  Public
 const getCategories = async (req, res) => {
   try {
-    const { search, isActive } = req.query;
+    const { search, isActive, page: pageQuery, limit: limitQuery } = req.query;
+    const page = parseInt(pageQuery) || 1;
+    const limit = parseInt(limitQuery) || 50;
+    const skip = (page - 1) * limit;
+
     const query = {};
 
     if (search) {
@@ -21,10 +25,17 @@ const getCategories = async (req, res) => {
     }
     // If isActive is not provided, get all categories regardless of status
 
-    const categories = await Category.find(query).sort({ name: 1 });
+    const count = await Category.countDocuments(query);
+    const categories = await Category.find(query)
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit);
+
     res.json({
       success: true,
-      count: categories.length,
+      count,
+      page,
+      pages: Math.ceil(count / limit),
       data: categories,
     });
   } catch (error) {

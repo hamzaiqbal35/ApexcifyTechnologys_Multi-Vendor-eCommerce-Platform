@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
+import { getOptimizedImageUrl } from '../utils/image';
 import { ShoppingBag, Star, PlayCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -54,9 +55,10 @@ const ProductCard = ({ product }) => {
           </>
         ) : (
           <img
-            src={getMediaUrl(product.images?.[0]) || 'https://via.placeholder.com/400'}
+            src={getOptimizedImageUrl(getMediaUrl(product.images?.[0]), { width: 500 }) || 'https://via.placeholder.com/400'}
             alt={product.name}
             className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-105"
+            loading="lazy"
           />
         )}
         

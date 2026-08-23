@@ -23,6 +23,8 @@ const OrderDetails = () => {
   const [editingItems, setEditingItems] = useState(false);
   const [updatedItems, setUpdatedItems] = useState([]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchOrder();
   }, [id]);

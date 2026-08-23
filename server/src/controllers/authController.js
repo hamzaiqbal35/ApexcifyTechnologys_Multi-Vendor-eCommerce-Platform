@@ -3,6 +3,13 @@ const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const { sendPasswordResetEmail } = require('../services/emailService');
 
+const getCookieOptions = () => ({
+  expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+});
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
@@ -27,9 +34,10 @@ const register = async (req, res) => {
 
     const token = generateToken(user._id);
 
-    res.status(201).json({
+    res.status(201)
+      .cookie('token', token, getCookieOptions())
+      .json({
       success: true,
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -66,9 +74,10 @@ const login = async (req, res) => {
 
     const token = generateToken(user._id);
 
-    res.json({
+    res.status(200)
+      .cookie('token', token, getCookieOptions())
+      .json({
       success: true,
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -214,9 +223,10 @@ const updatePassword = async (req, res) => {
     // Generate new token
     const token = generateToken(user._id);
 
-    res.json({
+    res.status(200)
+      .cookie('token', token, getCookieOptions())
+      .json({
       success: true,
-      token,
       message: 'Password updated successfully'
     });
   } catch (error) {
@@ -229,9 +239,23 @@ const updatePassword = async (req, res) => {
   }
 };
 
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Public
+const logout = (req, res) => {
+  res.cookie('token', 'none', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  });
+  res.status(200).json({ success: true, message: 'Logged out successfully' });
+};
+
 module.exports = { 
   register, 
   login, 
+  logout,
   getMe, 
   forgotPassword, 
   resetPassword,

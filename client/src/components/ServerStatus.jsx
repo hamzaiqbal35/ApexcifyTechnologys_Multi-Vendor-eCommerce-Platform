@@ -10,7 +10,7 @@ const ServerStatus = () => {
       try {
         await api.get('/health');
         setServerOnline(true);
-      } catch (error) {
+      } catch {
         setServerOnline(false);
       }
     };

@@ -14,6 +14,20 @@ const getAvatarUrl = (avatar) => {
   return `${FILE_BASE_URL}${avatar}`;
 };
 
+const NavLink = ({ to, children, className = '', isActive, onClick }) => (
+  <Link
+    to={to}
+    className={`relative px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+      isActive
+        ? 'text-black'
+        : 'text-gray-500 hover:text-black'
+    } ${className}`}
+    onClick={onClick}
+  >
+    {children}
+  </Link>
+);
+
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { cartItemCount } = useCart();
@@ -35,20 +49,6 @@ const Header = () => {
   const isAdminUser = isAuthenticated && user?.role === 'admin';
   const shouldHideAboutContact = isAuthenticated;
 
-  const NavLink = ({ to, children, className = '' }) => (
-    <Link
-      to={to}
-      className={`relative px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-        isActive(to)
-          ? 'text-black'
-          : 'text-gray-500 hover:text-black'
-      } ${className}`}
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      {children}
-    </Link>
-  );
-
   return (
     <header className="bg-white sticky top-0 z-50 border-b border-border">
       <div className="container mx-auto px-6">
@@ -66,20 +66,20 @@ const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-2">
-            <NavLink to="/products">Store</NavLink>
+            <NavLink to="/products" isActive={isActive('/products')} onClick={() => setMobileMenuOpen(false)}>Store</NavLink>
             {!shouldHideAboutContact && (
               <>
-                <NavLink to="/about">About</NavLink>
-                <NavLink to="/contact">Contact</NavLink>
+                <NavLink to="/about" isActive={isActive('/about')} onClick={() => setMobileMenuOpen(false)}>About</NavLink>
+                <NavLink to="/contact" isActive={isActive('/contact')} onClick={() => setMobileMenuOpen(false)}>Contact</NavLink>
               </>
             )}
             {isAuthenticated && (
               <>
 
                 {user.role === 'admin' && (
-                  <NavLink to="/admin/dashboard">Admin</NavLink>
+                  <NavLink to="/admin/dashboard" isActive={isActive('/admin/dashboard')} onClick={() => setMobileMenuOpen(false)}>Admin</NavLink>
                 )}
-                {!isAdminUser && <NavLink to="/orders">Orders</NavLink>}
+                {!isAdminUser && <NavLink to="/orders" isActive={isActive('/orders')} onClick={() => setMobileMenuOpen(false)}>Orders</NavLink>}
               </>
             )}
           </nav>
@@ -200,21 +200,21 @@ const Header = () => {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-border py-4 animate-fade-in">
             <nav className="flex flex-col space-y-1">
-              <NavLink to="/products" className="block w-full text-left">Store</NavLink>
+              <NavLink to="/products" className="block w-full text-left" isActive={isActive('/products')} onClick={() => setMobileMenuOpen(false)}>Store</NavLink>
               {!shouldHideAboutContact && (
                 <>
-                  <NavLink to="/about" className="block w-full text-left">About</NavLink>
-                  <NavLink to="/contact" className="block w-full text-left">Contact</NavLink>
+                  <NavLink to="/about" className="block w-full text-left" isActive={isActive('/about')} onClick={() => setMobileMenuOpen(false)}>About</NavLink>
+                  <NavLink to="/contact" className="block w-full text-left" isActive={isActive('/contact')} onClick={() => setMobileMenuOpen(false)}>Contact</NavLink>
                 </>
               )}
               {isAuthenticated && (
                 <>
 
                   {user.role === 'admin' && (
-                    <NavLink to="/admin/dashboard" className="block w-full text-left">Admin Dashboard</NavLink>
+                    <NavLink to="/admin/dashboard" className="block w-full text-left" isActive={isActive('/admin/dashboard')} onClick={() => setMobileMenuOpen(false)}>Admin Dashboard</NavLink>
                   )}
                   {!isAdminUser && (
-                    <NavLink to="/orders" className="block w-full text-left">Orders</NavLink>
+                    <NavLink to="/orders" className="block w-full text-left" isActive={isActive('/orders')} onClick={() => setMobileMenuOpen(false)}>Orders</NavLink>
                   )}
                 </>
               )}

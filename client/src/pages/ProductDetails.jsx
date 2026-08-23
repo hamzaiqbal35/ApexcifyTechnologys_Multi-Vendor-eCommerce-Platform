@@ -4,6 +4,8 @@ import api from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
+import { Helmet } from 'react-helmet-async';
+import { getOptimizedImageUrl } from '../utils/image';
 import { Star, Minus, Plus, Loader2, ArrowLeft, PlayCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -25,6 +27,8 @@ const ProductDetails = () => {
   const [review, setReview] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchProduct();
   }, [id]);
@@ -91,6 +95,13 @@ const ProductDetails = () => {
 
   return (
     <div className="bg-white min-h-screen animate-fade-in">
+      <Helmet>
+        <title>{product.name} | Fluxmart</title>
+        <meta name="description" content={product.description.substring(0, 160)} />
+        <meta property="og:title" content={product.name} />
+        <meta property="og:description" content={product.description.substring(0, 160)} />
+        <meta property="og:image" content={getOptimizedImageUrl(getMediaUrl(product.images?.[0]), { width: 1200 })} />
+      </Helmet>
       <div className="container mx-auto px-6 py-12">
         <button onClick={() => navigate(-1)} className="mb-8 text-sm font-medium text-gray-500 hover:text-black flex items-center transition-colors">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
@@ -109,7 +120,7 @@ const ProductDetails = () => {
                 />
               ) : (
                 <img
-                  src={getMediaUrl(product.images?.[activeImage]) || 'https://via.placeholder.com/600'}
+                  src={getOptimizedImageUrl(getMediaUrl(product.images?.[activeImage]), { width: 800 }) || 'https://via.placeholder.com/600'}
                   alt={product.name}
                   className="max-w-full max-h-full object-contain mix-blend-multiply"
                 />
@@ -136,7 +147,7 @@ const ProductDetails = () => {
                           </div>
                         </>
                       ) : (
-                        <img src={mediaSrc} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover mix-blend-multiply p-2" />
+                        <img src={getOptimizedImageUrl(mediaSrc, { width: 200 })} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover mix-blend-multiply p-2" />
                       )}
                     </button>
                   );

@@ -306,4 +306,8 @@ orderSchema.statics.findInconsistent = async function () {
   return inconsistent;
 };
 
+// Indexes for optimization
+orderSchema.index({ user: 1 });
+orderSchema.index({ status: 1 });
+
 module.exports = mongoose.model('Order', orderSchema);

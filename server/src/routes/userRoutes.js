@@ -12,20 +12,31 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
-    const count = await User.countDocuments();
-    const users = await User.find()
+    const search = req.query.search;
+    const role = req.query.role;
+    
+    let query = {};
+    
+    if (role) {
+      query.role = role;
+    }
+    
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const count = await User.countDocuments(query);
+    const users = await User.find(query)
       .select('-password')
       .skip(skip)
       .limit(limit);
     
-    // Add full avatar URL to each user
+    // Add full avatar URL to each user (not needed anymore with Cloudinary absolute URLs, but keep the map logic for backwards compatibility if needed, though they'll just use it directly)
     const usersWithAvatarUrl = users.map(user => {
       const userObj = user.toObject();
-      if (userObj.avatar) {
-        // Remove any existing /uploads/avatars/ from the avatar path to prevent duplication
-        const cleanAvatarPath = userObj.avatar.replace(/^\/uploads\/avatars\//, '');
-        userObj.avatar = `${req.protocol}://${req.get('host')}/uploads/avatars/${cleanAvatarPath}`;
-      }
       return userObj;
     });
     
@@ -47,12 +58,7 @@ router.get('/me', protect, async (req, res) => {
     const user = await User.findById(req.user._id).select('-password');
     const userObj = user.toObject();
     
-    // Add full avatar URL if avatar exists
-    if (userObj.avatar) {
-      // Remove any existing /uploads/avatars/ from the avatar path to prevent duplication
-      const cleanAvatarPath = userObj.avatar.replace(/^\/uploads\/avatars\//, '');
-      userObj.avatar = `${req.protocol}://${req.get('host')}/uploads/avatars/${cleanAvatarPath}`;
-    }
+    // Add full avatar URL if avatar exists (Cloudinary URLs are already absolute)
     
     res.json({
       success: true,
@@ -73,12 +79,7 @@ router.get('/:id', protect, authorize('admin'), async (req, res) => {
     
     const userObj = user.toObject();
     
-    // Add full avatar URL if avatar exists
-    if (userObj.avatar) {
-      // Remove any existing /uploads/avatars/ from the avatar path to prevent duplication
-      const cleanAvatarPath = userObj.avatar.replace(/^\/uploads\/avatars\//, '');
-      userObj.avatar = `${req.protocol}://${req.get('host')}/uploads/avatars/${cleanAvatarPath}`;
-    }
+    // Add full avatar URL if avatar exists (Cloudinary URLs are already absolute)
     
     res.json({
       success: true,
@@ -141,7 +142,7 @@ router.put('/me/avatar', protect, uploadAvatar.single('avatar'), async (req, res
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+    const avatarPath = req.file.path;
 
     const user = await User.findByIdAndUpdate(
       req.user._id,

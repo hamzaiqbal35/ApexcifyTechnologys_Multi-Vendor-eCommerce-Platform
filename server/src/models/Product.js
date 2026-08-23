@@ -103,4 +103,8 @@ productSchema.pre('save', function(next) {
   next();
 });
 
+// Indexes for optimization
+productSchema.index({ name: 'text', description: 'text' });
+productSchema.index({ category: 1, price: 1 });
+
 module.exports = mongoose.model('Product', productSchema);

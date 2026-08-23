@@ -33,7 +33,7 @@ exports.createBanner = async (req, res) => {
     let imageUrl = req.body.imageUrl;
 
     if (req.file) {
-      imageUrl = `/uploads/banners/${req.file.filename}`;
+      imageUrl = req.file.path;
     }
 
     if (!imageUrl) {
@@ -88,7 +88,7 @@ exports.updateBanner = async (req, res) => {
 
     let imageUrl = banner.imageUrl;
     if (req.file) {
-      imageUrl = `/uploads/banners/${req.file.filename}`;
+      imageUrl = req.file.path;
     }
 
     banner.title = title !== undefined ? title : banner.title;

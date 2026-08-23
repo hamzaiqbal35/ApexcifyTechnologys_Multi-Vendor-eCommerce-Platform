@@ -5,11 +5,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import api from '../utils/api';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { formatPricePKR } from '../utils/currency';
-import { format, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import { 
   LayoutDashboard, Users, Package, ShoppingCart, 
   Tags, FileText, Image as ImageIcon, Trash2, Upload,
-  CheckCircle, XCircle, Edit, DollarSign, Settings as SettingsIcon
+  CheckCircle, XCircle, Edit, DollarSign, Settings as SettingsIcon, HelpCircle
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
@@ -18,7 +18,11 @@ import {
   AreaChart, Area, ComposedChart, ScatterChart, Scatter, RadarChart, Radar,
   Treemap, Brush, ReferenceLine, ReferenceDot, ReferenceArea
 } from 'recharts';
+import AdminUsersTab from '../components/AdminUsersTab';
+import AdminOrdersTab from '../components/AdminOrdersTab';
+import AdminCategoriesTab from '../components/AdminCategoriesTab';
 import AdminProductsTab from '../components/AdminProductsTab';
+import AdminFAQsTab from '../components/AdminFAQsTab';
 
 const AdminDashboard = () => {
   const location = useLocation();
@@ -235,6 +239,7 @@ const AdminDashboard = () => {
     { id: 'orders', label: 'Orders', icon: <ShoppingCart className="w-5 h-5" /> },
     { id: 'categories', label: 'Categories', icon: <Tags className="w-5 h-5" /> },
     { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
+    { id: 'faqs', label: 'FAQs', icon: <HelpCircle className="w-5 h-5" /> },
     { id: 'banners', label: 'Banners', icon: <ImageIcon className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-5 h-5" /> }
   ];
@@ -290,15 +295,7 @@ const AdminDashboard = () => {
             ) : (
               <>
                 {activeTab === 'overview' && <OverviewTab stats={stats} />}
-                {activeTab === 'users' && (
-                  <UsersTab
-                    users={users}
-                    onToggleStatus={handleToggleUserStatus}
-                    onDelete={handleDeleteUser}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                  />
-                )}
+                {activeTab === 'users' && <AdminUsersTab />}
                 {activeTab === 'products' && (
                   <AdminProductsTab
                     products={products}
@@ -307,29 +304,12 @@ const AdminDashboard = () => {
                     refreshProducts={fetchProducts}
                   />
                 )}
-                {activeTab === 'orders' && (
-                  <OrdersTab
-                    orders={orders}
-                    onUpdateStatus={handleUpdateOrderStatus}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                    onTogglePayment={handleTogglePayment}
-                  />
-                )}
-                {activeTab === 'categories' && (
-                  <CategoriesTab
-                    categories={categories}
-                    onAdd={handleAddCategory}
-                    onDelete={handleDeleteCategory}
-                  />
-                )}
+                {activeTab === 'orders' && <AdminOrdersTab />}
+                {activeTab === 'categories' && <AdminCategoriesTab />}
                 {activeTab === 'reports' && (
-                  <ReportsTab
-                    orders={orders}
-                    products={products}
-                    users={users}
-                  />
+                  <ReportsTab />
                 )}
+                {activeTab === 'faqs' && <AdminFAQsTab />}
                 {activeTab === 'banners' && <BannersTab />}
                 {activeTab === 'settings' && <SettingsTab />}
               </>
@@ -406,613 +386,8 @@ const StatCard = ({ title, value, icon, color, change, badge }) => {
   );
 };
 
-// Users Tab Component
-const UsersTab = ({ users, onToggleStatus, onDelete, searchTerm, onSearchChange }) => {
-  const filteredUsers = users.filter(u =>
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold">User Management</h2>
-        <div className="relative">
-          <label htmlFor="user-search" className="sr-only">Search users</label>
-          <input
-            id="user-search"
-            name="userSearch"
-            type="search"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
-            aria-label="Search users"
-          />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredUsers.map((user) => (
-              <tr key={user._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gradient-to-br from-brand-orange to-brand-black rounded-full flex items-center justify-center text-white font-semibold mr-3 overflow-hidden">
-                      {user.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = '';
-                            e.target.parentNode.textContent = user.name?.charAt(0).toUpperCase() || 'U';
-                          }}
-                        />
-                      ) : (
-                        user.name?.charAt(0).toUpperCase() || 'U'
-                      )}
-                    </div>
-                    <span className="font-medium">{user.name}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-brand-orange/10 text-brand-orange capitalize">
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex space-x-2">
-                    {user.role !== 'admin' && (
-                      <button
-                        onClick={() => onToggleStatus(user._id, user.isActive)}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${user.isActive
-                          ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                          : 'bg-green-100 text-green-800 hover:bg-green-200'
-                          }`}
-                      >
-                        {user.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                    )}
-                    {user.role !== 'admin' && (
-                      <button
-                        onClick={() => onDelete(user._id)}
-                        className="px-3 py-1 bg-red-100 text-red-800 rounded text-sm font-medium hover:bg-red-200 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
-// Orders Tab Component
-const OrdersTab = ({ orders, onUpdateStatus, searchTerm, onSearchChange, onTogglePayment }) => {
-  const [shippingModal, setShippingModal] = useState({ isOpen: false, orderId: null });
-  const [shippingData, setShippingData] = useState({ trackingNumber: '', courier: '', estimatedDeliveryDate: '' });
-  const [cancelModal, setCancelModal] = useState({ isOpen: false, orderId: null });
-  const [cancelReason, setCancelReason] = useState('');
-
-  const filteredOrders = orders.filter(o =>
-    o._id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleStatusChange = (orderId, newStatus) => {
-    if (newStatus === 'shipped') {
-      setShippingModal({ isOpen: true, orderId });
-      setShippingData({ trackingNumber: '', courier: '', estimatedDeliveryDate: '' });
-    } else if (newStatus === 'cancelled') {
-      setCancelModal({ isOpen: true, orderId });
-      setCancelReason('');
-    } else {
-      onUpdateStatus(orderId, newStatus);
-    }
-  };
-
-  const handleShippingSubmit = (e) => {
-    e.preventDefault();
-    onUpdateStatus(shippingModal.orderId, 'shipped', shippingData);
-    setShippingModal({ isOpen: false, orderId: null });
-  };
-
-  const handleCancelSubmit = (e) => {
-    e.preventDefault();
-    if (cancelReason.trim().length < 5) {
-      alert('Reason must be at least 5 characters');
-      return;
-    }
-    onUpdateStatus(cancelModal.orderId, 'cancelled', { reason: cancelReason });
-    setCancelModal({ isOpen: false, orderId: null });
-  };
-
-  return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold">Order Management</h2>
-        <div className="relative">
-          <label htmlFor="order-search" className="sr-only">Search orders</label>
-          <input
-            id="order-search"
-            name="orderSearch"
-            type="search"
-            placeholder="Search orders..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
-            aria-label="Search orders"
-          />
-        </div>
-      </div>
-
-      {shippingModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-4">Enter Shipping Details</h3>
-            <form onSubmit={handleShippingSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Courier Name</label>
-                <input type="text" placeholder="e.g. TCS, Leopard" required className="w-full p-2 border rounded" value={shippingData.courier} onChange={(e) => setShippingData({...shippingData, courier: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Tracking Number</label>
-                <input type="text" placeholder="Tracking Number" required className="w-full p-2 border rounded" value={shippingData.trackingNumber} onChange={(e) => setShippingData({...shippingData, trackingNumber: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Estimated Delivery Date</label>
-                <input type="date" required className="w-full p-2 border rounded" value={shippingData.estimatedDeliveryDate} onChange={(e) => setShippingData({...shippingData, estimatedDeliveryDate: e.target.value})} />
-              </div>
-              <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShippingModal({ isOpen: false, orderId: null })} className="px-4 py-2 text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-brand-orange text-white rounded">Submit</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {cancelModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-bold text-red-600 mb-4">Cancel Order</h3>
-            <form onSubmit={handleCancelSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Cancellation Reason</label>
-                <textarea 
-                  required 
-                  minLength={5}
-                  placeholder="Provide a reason..." 
-                  className="w-full p-2 border rounded resize-none h-24" 
-                  value={cancelReason} 
-                  onChange={(e) => setCancelReason(e.target.value)} 
-                />
-              </div>
-              <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setCancelModal({ isOpen: false, orderId: null })} className="px-4 py-2 text-gray-600">Back</button>
-                <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Confirm Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {filteredOrders.map((order) => (
-          <div key={order._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-4 gap-4">
-              <div className="w-full">
-                <Link to={`/orders/${order._id}`} className="font-semibold text-brand-orange hover:underline">
-                  Order #{order._id.slice(-8)}
-                </Link>
-                <p className="text-sm text-gray-600">
-                  {order.user?.name} - {new Date(order.createdAt).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-600">Total: {formatPricePKR(order.totalPrice)}</p>
-
-                {/* Shipping Info Display */}
-                {order.status === 'shipped' && order.trackingNumber && (
-                  <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
-                    <p><span className="font-semibold">Courier:</span> {order.courier}</p>
-                    <p><span className="font-semibold">Tracking:</span> {order.trackingNumber}</p>
-                    <p><span className="font-semibold">Est. Delivery:</span> {new Date(order.estimatedDeliveryDate).toLocaleDateString()}</p>
-                  </div>
-                )}
-                
-                {/* Cancel Info Display */}
-                {order.status === 'cancelled' && order.cancellationReason && (
-                  <div className="mt-2 text-sm bg-red-50 text-red-800 p-2 rounded border border-red-100">
-                    <p><span className="font-semibold">Reason:</span> {order.cancellationReason}</p>
-                  </div>
-                )}
-
-                {/* Return Info Display */}
-                {['return_requested', 'returned'].includes(order.status) && order.returnReason && (
-                  <div className="mt-2 text-sm bg-amber-50 text-amber-800 p-2 rounded border border-amber-100">
-                    <p><span className="font-semibold">Return Reason:</span> {order.returnReason}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col items-start md:items-end space-y-2 w-full md:w-auto mt-4 md:mt-0">
-                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                  <select
-                    value={order.status}
-                    onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                    className="px-3 py-1 border rounded-lg text-sm"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="return_requested" disabled>Return Requested</option>
-                    <option value="returned">Returned (Refund & Restock)</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                    order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    order.status === 'returned' ? 'bg-gray-100 text-gray-800' :
-                    order.status === 'return_requested' ? 'bg-amber-100 text-amber-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                    {order.status}
-                  </span>
-                </div>
-
-                {/* Admin Payment Toggle */}
-                {order.status === 'delivered' && (
-                  <button
-                    onClick={() => onTogglePayment(order._id)}
-                    className={`px-3 py-1 text-xs rounded font-semibold ${order.isPaid
-                      ? 'bg-green-100 text-green-800 border border-green-200'
-                      : 'bg-red-100 text-red-800 border border-red-200'
-                      }`}
-                  >
-                    {order.isPaid ? 'Paid' : 'Mark as Paid'}
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="border-t pt-3">
-              <p className="text-sm font-medium mb-2">Items:</p>
-              <div className="space-y-1">
-                {order.orderItems?.map((item, idx) => (
-                  <div key={idx} className="text-sm text-gray-600">
-                    {item.name} x {item.quantity} - {formatPricePKR(item.price)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Categories Tab Component
-const CategoriesTab = () => {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [newCategory, setNewCategory] = useState({ name: '', description: '' });
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get(`/categories?search=${searchTerm}`);
-      setCategories(res.data.data || []);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      alert('Failed to fetch categories');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCategories();
-  }, [searchTerm]);
-
-  // Handle create category
-  const handleCreateCategory = async (e) => {
-    e.preventDefault();
-    if (!newCategory.name.trim()) return;
-
-    try {
-      setIsSubmitting(true);
-      await api.post('/categories', newCategory);
-      setNewCategory({ name: '', description: '' });
-      fetchCategories();
-    } catch (error) {
-      console.error('Error creating category:', error);
-      alert(error.response?.data?.message || 'Failed to create category');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle update category
-  const handleUpdateCategory = async (e) => {
-    e.preventDefault();
-    if (!editingCategory?.name?.trim()) return;
-
-    try {
-      setIsSubmitting(true);
-      await api.put(`/categories/${editingCategory._id}`, {
-        name: editingCategory.name,
-        description: editingCategory.description,
-        isActive: editingCategory.isActive
-      });
-      setEditingCategory(null);
-      fetchCategories();
-    } catch (error) {
-      console.error('Error updating category:', error);
-      alert(error.response?.data?.message || 'Failed to update category');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle delete category (hard delete if no products)
-  const handleDeleteCategory = async (categoryId) => {
-    if (!window.confirm('Are you sure you want to delete this category? This will permanently remove the category if there are no products in it. This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await api.delete(`/categories/${categoryId}`);
-
-      if (response.data.success) {
-        // Show success message
-        alert(response.data.message || 'Category deleted successfully');
-
-        // Refresh the categories list
-        await fetchCategories();
-      } else {
-        // Handle case where success is false but no error was thrown
-        alert(response.data.message || 'Failed to delete category');
-      }
-    } catch (error) {
-      console.error('Error deleting category:', error);
-
-      // More detailed error handling
-      const errorMessage = error.response?.data?.message ||
-        (error.response?.status === 400
-          ? 'Cannot delete category with active products. Please deactivate or move the products first.'
-          : 'Failed to delete category. Please try again.');
-
-      alert(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Toggle category status
-  const toggleCategoryStatus = async (category) => {
-    try {
-      await api.put(`/categories/${category._id}`, {
-        isActive: !category.isActive
-      });
-      fetchCategories();
-    } catch (error) {
-      console.error('Error toggling category status:', error);
-      alert('Failed to update category status');
-    }
-  };
-
-  if (loading && categories.length === 0) {
-    return <div className="text-center py-8">Loading categories...</div>;
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Category Management</h2>
-        <div className="w-64">
-          <label htmlFor="category-search" className="sr-only">Search categories</label>
-          <input
-            id="category-search"
-            name="categorySearch"
-            type="search"
-            placeholder="Search categories..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
-            aria-label="Search categories"
-          />
-        </div>
-      </div>
-
-      {/* Add/Edit Category Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">
-          {editingCategory ? 'Edit Category' : 'Add New Category'}
-        </h3>
-        <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="category-name"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Category Name *
-              </label>
-              <input
-                id="category-name"
-                name="categoryName"
-                type="text"
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-orange/50"
-                value={editingCategory ? editingCategory.name : newCategory.name}
-                onChange={(e) =>
-                  editingCategory
-                    ? setEditingCategory({ ...editingCategory, name: e.target.value })
-                    : setNewCategory({ ...newCategory, name: e.target.value })
-                }
-                required
-                aria-label="Category name"
-                placeholder="Enter category name"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="category-description"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Description
-              </label>
-              <input
-                id="category-description"
-                name="categoryDescription"
-                type="text"
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-orange/50"
-                value={editingCategory ? editingCategory.description : newCategory.description}
-                onChange={(e) =>
-                  editingCategory
-                    ? setEditingCategory({ ...editingCategory, description: e.target.value })
-                    : setNewCategory({ ...newCategory, description: e.target.value })
-                }
-                aria-label="Category description"
-                placeholder="Enter description (optional)"
-              />
-            </div>
-          </div>
-
-          {editingCategory && (
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isActive"
-                name="isActive"
-                checked={editingCategory.isActive}
-                onChange={(e) =>
-                  setEditingCategory({
-                    ...editingCategory,
-                    isActive: e.target.checked,
-                  })
-                }
-                className="h-4 w-4 text-brand-orange focus:ring-brand-orange/50 border-gray-300 rounded accent-brand-orange"
-                aria-label="Category active status"
-              />
-              <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
-                Active
-              </label>
-            </div>
-          )}
-
-          <div className="flex space-x-3 pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-brand-orange text-white rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-2 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Saving...' : editingCategory ? 'Update Category' : 'Add Category'}
-            </button>
-            {editingCategory && (
-              <button
-                type="button"
-                onClick={() => setEditingCategory(null)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-2"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      {/* Categories List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold">All Categories</h3>
-        </div>
-
-        {categories.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No categories found. Add a new category to get started.
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {categories.map((category) => (
-              <div key={category._id} className="p-4 hover:bg-gray-50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
-                  <div className="flex items-center flex-wrap gap-2">
-                    <span className={`font-medium ${!category.isActive ? 'text-gray-400' : 'text-gray-900'}`}>
-                      {category.name}
-                    </span>
-                    {!category.isActive && (
-                      <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                  {category.description && (
-                    <p className="text-sm text-gray-500 mt-1">{category.description}</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => toggleCategoryStatus(category)}
-                    className={`px-3 py-1 text-sm rounded-md ${category.isActive
-                      ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                      : 'bg-green-100 text-green-700 hover:bg-green-200'
-                      }`}
-                  >
-                    {category.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    onClick={() => setEditingCategory(category)}
-                    className="px-3 py-1 text-sm text-brand-orange hover:bg-brand-orange/10 rounded-md"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCategory(category._id)}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Reports Tab Component
-const ReportsTab = ({ orders, products, users }) => {
+const ReportsTab = () => {
   const [dateRange, setDateRange] = useState({
     startDate: subDays(new Date(), 30).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
@@ -1123,7 +498,7 @@ const ReportsTab = ({ orders, products, users }) => {
     }
   };
 
-  const { sales = {}, topProducts = [], topCategories = [], loading } = reportData;
+  const { sales = {}, topProducts = [], loading } = reportData;
 
   // Handle both old and new sales data structure
   const salesByDate = sales.salesByDate ||
@@ -1311,7 +686,7 @@ const ReportsTab = ({ orders, products, users }) => {
                             borderRadius: '0.375rem',
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                           }}
-                          formatter={(value, name, item) => {
+                          formatter={() => {
                             // Don't show the default tooltip items
                             return null;
                           }}

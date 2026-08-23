@@ -16,6 +16,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const faqRoutes = require('./routes/faqRoutes');
 const { handleWebhook } = require('./controllers/paymentController');
 const { apiLimiter, authLimiter, orderLimiter } = require('./middleware/rateLimiter');
 
@@ -53,6 +54,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/faqs', faqRoutes);
 
 // Apply specific limiters to specific routes
 app.use('/api/users/login', authLimiter);

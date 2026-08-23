@@ -2,20 +2,28 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api, { getMediaUrl } from '../utils/api';
 import { formatPricePKR } from '../utils/currency';
-import { Package, ArrowRight } from 'lucide-react';
+import { Package, ArrowRight, Filter } from 'lucide-react';
+import Pagination from '../components/Pagination';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    fetchOrders(page, statusFilter);
+  }, [page, statusFilter]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (currentPage, currentStatus) => {
     try {
-      const res = await api.get('/orders/my-orders');
+      setLoading(true);
+      const res = await api.get(`/orders/my-orders?page=${currentPage}&limit=5&status=${currentStatus}`);
       setOrders(res.data.orders);
+      setTotalPages(res.data.pages || 1);
+      setPage(res.data.page || 1);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -34,7 +42,31 @@ const Orders = () => {
   return (
     <div className="bg-white min-h-screen py-12 animate-fade-in">
       <div className="container mx-auto px-6 max-w-5xl">
-        <h1 className="text-3xl font-bold tracking-tight text-black mb-10">Order History</h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-black">Order History</h1>
+          
+          <div className="flex items-center gap-2 bg-gray-50 border border-border rounded-lg px-3 py-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="bg-transparent border-none text-sm font-medium text-black focus:ring-0 outline-none cursor-pointer pr-4"
+            >
+              <option value="all">All Orders</option>
+              <option value="pending">Pending</option>
+              <option value="accepted">Accepted</option>
+              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="return_requested">Return Requested</option>
+              <option value="returned">Returned</option>
+            </select>
+          </div>
+        </div>
 
         {orders.length === 0 ? (
           <div className="text-center py-24 bg-gray-50 border border-border rounded-2xl">
@@ -124,6 +156,16 @@ const Orders = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        
+        {orders.length > 0 && (
+          <div className="mt-8">
+            <Pagination 
+              currentPage={page} 
+              totalPages={totalPages} 
+              onPageChange={setPage} 
+            />
           </div>
         )}
       </div>

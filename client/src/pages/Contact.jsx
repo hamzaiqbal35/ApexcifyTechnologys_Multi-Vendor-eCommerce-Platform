@@ -70,6 +70,8 @@ const Contact = () => {
         });
       }
     } catch (error) {
+      console.error(error);
+      console.error(error);
       setStatus({
         type: 'error',
         message: 'An error occurred. Please try again later.'

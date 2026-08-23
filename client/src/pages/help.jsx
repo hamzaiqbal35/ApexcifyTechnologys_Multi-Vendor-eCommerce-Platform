@@ -1,41 +1,67 @@
-import { useState } from 'react';
-import { Search, ChevronDown, Rocket, ShoppingBag, RotateCcw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronDown, Rocket, ShoppingBag, RotateCcw, CreditCard, Shield, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import api from '../utils/api';
+import LoadingState from '../components/states/LoadingState';
+import ErrorState from '../components/states/ErrorState';
+
+const getCategoryIcon = (categoryName) => {
+  switch (categoryName) {
+    case 'Getting Started': return <Rocket className="w-5 h-5" />;
+    case 'Shopping & Orders': return <ShoppingBag className="w-5 h-5" />;
+    case 'Returns & Refunds': return <RotateCcw className="w-5 h-5" />;
+    case 'Payments': return <CreditCard className="w-5 h-5" />;
+    case 'Account & Security': return <Shield className="w-5 h-5" />;
+    default: return <HelpCircle className="w-5 h-5" />;
+  }
+};
 
 const Help = () => {
   const [activeCategory, setActiveCategory] = useState(0);
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const categories = [
-    {
-      name: 'Getting Started',
-      icon: <Rocket className="w-5 h-5" />,
-      faqs: [
-        { question: 'How do I create an account?', answer: 'Click on "Sign Up" in the top right corner. Fill in your email, create a password, and follow the verification steps.' },
-        { question: 'How do I reset my password?', answer: 'Click "Forgot Password" on the login page. Enter your email address, and we\'ll send you a reset link.' },
-        { question: 'Can I change my account email?', answer: 'Yes! Go to Account Settings > Profile Information and click "Edit Email".' }
-      ]
-    },
-    {
-      name: 'Shopping & Orders',
-      icon: <ShoppingBag className="w-5 h-5" />,
-      faqs: [
-        { question: 'How do I place an order?', answer: 'Browse products, add items to your cart, proceed to checkout, enter your details, and complete payment.' },
-        { question: 'Can I modify my order?', answer: 'If your order hasn\'t shipped yet, contact us within 1 hour of purchase.' },
-        { question: 'How do I track my order?', answer: 'Log into your account and go to "My Orders". Click on the specific order to view tracking.' },
-        { question: 'Payment methods?', answer: 'We currently accept Cash on Delivery (COD).' }
-      ]
-    },
-    {
-      name: 'Returns & Refunds',
-      icon: <RotateCcw className="w-5 h-5" />,
-      faqs: [
-        { question: 'What is your return policy?', answer: 'We offer 30 days from delivery for most items. Products must be unused.' },
-        { question: 'How long does a refund take?', answer: 'Refunds are processed within 5-7 business days after inspection.' }
-      ]
-    },
-  ];
+  useEffect(() => {
+    fetchFaqs();
+  }, []);
+
+  const fetchFaqs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.get('/faqs');
+      const rawFaqs = res.data.data || [];
+      
+      // Group FAQs by category
+      const grouped = rawFaqs.reduce((acc, faq) => {
+        if (!acc[faq.category]) {
+          acc[faq.category] = {
+            name: faq.category,
+            icon: getCategoryIcon(faq.category),
+            faqs: []
+          };
+        }
+        acc[faq.category].faqs.push(faq);
+        return acc;
+      }, {});
+
+      const formattedCategories = Object.values(grouped);
+      setCategories(formattedCategories);
+    } catch (err) {
+      console.error(err);
+      console.error(err);
+      setError('Failed to load FAQs. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <LoadingState message="Loading Help Center..." />;
+  if (error) return <ErrorState message={error} onRetry={fetchFaqs} />;
 
   return (
     <div className="min-h-screen bg-background animate-fade-in flex flex-col">
@@ -77,13 +103,18 @@ const Help = () => {
                       {category.name}
                     </button>
                   ))}
+                  {categories.length === 0 && (
+                    <p className="px-3 text-sm text-gray-500">No categories found.</p>
+                  )}
                 </nav>
               </div>
             </div>
 
             {/* Content */}
             <div className="lg:w-3/4">
-              <h2 className="text-2xl font-bold mb-8 text-black tracking-tight">{categories[activeCategory]?.name}</h2>
+              <h2 className="text-2xl font-bold mb-8 text-black tracking-tight">
+                {categories[activeCategory]?.name || 'FAQs'}
+              </h2>
               
               <div className="space-y-4">
                 {categories[activeCategory]?.faqs.map((faq, index) => {
@@ -94,7 +125,7 @@ const Help = () => {
                   }
                   
                   return (
-                    <div key={index} className="border border-border rounded-xl bg-white overflow-hidden transition-all duration-200">
+                    <div key={faq._id || index} className="border border-border rounded-xl bg-white overflow-hidden transition-all duration-200">
                       <button
                         onClick={() => setExpandedFaq(isExpanded ? null : `${activeCategory}-${index}`)}
                         className="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none"
@@ -110,12 +141,15 @@ const Help = () => {
                     </div>
                   );
                 })}
+                {categories[activeCategory]?.faqs.length === 0 && (
+                  <p className="text-gray-500">No FAQs available in this category.</p>
+                )}
               </div>
 
               <div className="mt-12 p-8 border border-border rounded-xl bg-gray-50 text-center">
                 <h3 className="text-lg font-semibold text-black mb-2">Still need help?</h3>
                 <p className="text-gray-500 text-sm mb-6">Our team is available to assist you with any questions.</p>
-                <Link to="/contact" className="btn-secondary">
+                <Link to="/contact" className="px-6 py-2.5 bg-black text-white rounded-lg font-medium text-sm hover:bg-gray-800 transition-colors">
                   Contact Support
                 </Link>
               </div>

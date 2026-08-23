@@ -301,7 +301,7 @@ const uploadImages = async (req, res) => {
       return res.status(400).json({ message: 'Please upload at least one image' });
     }
 
-    const imageUrls = req.files.map(file => `/uploads/products/${file.filename}`);
+    const imageUrls = req.files.map(file => file.path);
 
     res.json({
       success: true,

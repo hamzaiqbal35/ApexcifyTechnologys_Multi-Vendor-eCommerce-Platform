@@ -1,5 +1,5 @@
 import logoImg from '../assets/logo.png';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Footer = () => {
   const location = useLocation();
@@ -30,29 +30,24 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold text-black mb-4">Platform</h4>
             <ul className="space-y-3 text-sm text-gray-500">
-              <li><a href="/products" className="hover:text-black transition-colors">Store</a></li>
-              <li><a href="/about" className="hover:text-black transition-colors">About</a></li>
-              <li><a href="/contact" className="hover:text-black transition-colors">Contact</a></li>
+              <li><Link to="/products" className="hover:text-black transition-colors">Store</Link></li>
+              <li><Link to="/about" className="hover:text-black transition-colors">About</Link></li>
+              <li><Link to="/contact" className="hover:text-black transition-colors">Contact</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-semibold text-black mb-4">Legal & Support</h4>
             <ul className="space-y-3 text-sm text-gray-500">
-              <li><a href="/help" className="hover:text-black transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-black transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-black transition-colors">Terms of Service</a></li>
+              <li><Link to="/help" className="hover:text-black transition-colors">Help Center</Link></li>
+              <li><Link to="/legal/privacy-policy" className="hover:text-black transition-colors">Legal & Privacy Hub</Link></li>
             </ul>
           </div>
         </div>
         
         <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row items-center justify-between">
           <p className="text-sm text-gray-400">&copy; {new Date().getFullYear()} Fluxmart. All rights reserved.</p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-400 hover:text-black transition-colors text-sm">Twitter</a>
-            <a href="#" className="text-gray-400 hover:text-black transition-colors text-sm">GitHub</a>
-            <a href="#" className="text-gray-400 hover:text-black transition-colors text-sm">Dribbble</a>
-          </div>
+
         </div>
       </div>
     </footer>

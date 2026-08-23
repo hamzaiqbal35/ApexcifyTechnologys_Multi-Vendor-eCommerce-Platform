@@ -4,6 +4,7 @@ import api, { getMediaUrl } from '../utils/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatPricePKR } from '../utils/currency';
+import { getOptimizedImageUrl } from '../utils/image';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -113,7 +114,7 @@ const Cart = () => {
                         <video src={getMediaUrl(product.images[0])} className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105" />
                       ) : (
                         <img
-                          src={getMediaUrl(product.images?.[0]) || 'https://via.placeholder.com/150'}
+                          src={getOptimizedImageUrl(getMediaUrl(product.images?.[0]), { width: 150 }) || 'https://via.placeholder.com/150'}
                           alt={product.name}
                           className="w-full h-full object-contain mix-blend-multiply transition-transform group-hover:scale-105"
                         />

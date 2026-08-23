@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { X, PackagePlus, Save, Image as ImageIcon, Tag, FileText, DollarSign, Box, UploadCloud, ArrowLeft, ArrowRight, Trash2, PlayCircle, Loader2 } from 'lucide-react';
+import { X, Plus, PackagePlus, Save, Image as ImageIcon, Tag, FileText, DollarSign, Box, UploadCloud, ArrowLeft, ArrowRight, Trash2, PlayCircle, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 
 const getMediaUrl = (path) => {
@@ -10,7 +10,15 @@ const getMediaUrl = (path) => {
   return `${baseUrl}${path}`;
 };
 
-const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProducts }) => {
+import Pagination from './Pagination';
+
+const AdminProductsTab = () => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add', 'edit'
   const [productForm, setProductForm] = useState({
@@ -34,6 +42,35 @@ const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProduct
     fetchCategories();
   }, []);
 
+  // Fetch products with pagination and search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, categoryFilter]);
+
+  useEffect(() => {
+    fetchProducts(page);
+  }, [page]);
+
+  const fetchProducts = async (currentPage) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/products/admin/all?page=${currentPage}&limit=10&search=${searchTerm}${categoryFilter ? `&category=${categoryFilter}` : ''}`);
+      setProducts(res.data.products || []);
+      setTotalPages(res.data.totalPages || 1);
+      setPage(Number(res.data.currentPage) || 1);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error('Failed to fetch products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshProducts = () => fetchProducts(page);
+
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [reasonAction, setReasonAction] = useState(null); // { type: 'deactivate'|'delete', productId, currentStatus }
   const [reasonText, setReasonText] = useState('');
@@ -42,10 +79,7 @@ const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProduct
   const [stockProduct, setStockProduct] = useState(null);
   const [stockForm, setStockForm] = useState({ action: 'add', quantity: 1, reason: '' });
 
-  const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products; // Already filtered by backend
 
   const handleOpenAddModal = () => {
     setModalMode('add');
@@ -192,21 +226,35 @@ const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProduct
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold">Product Management</h2>
-        <div className="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto">
-          <div className="relative w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange bg-white text-sm"
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat.name}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+          <div className="relative">
+            <label htmlFor="product-search" className="sr-only">Search products</label>
             <input
+              id="product-search"
               type="search"
               placeholder="Search products..."
               value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange"
             />
           </div>
           <button
             onClick={handleOpenAddModal}
-            className="w-full sm:w-auto px-4 py-2 bg-brand-orange text-white rounded-lg hover:bg-brand-orange/90 transition-colors font-medium whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-orange text-white rounded-lg hover:bg-orange-600 transition-colors"
           >
-            + Add Product
+            <Plus className="w-4 h-4" /> Add Product
           </button>
         </div>
       </div>
@@ -215,7 +263,7 @@ const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProduct
         {filteredProducts.map((product) => (
           <div key={product._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex flex-col sm:flex-row items-start sm:space-x-4 gap-4 sm:gap-0">
-              {product.images?.[0] && product.images[0].match(/\.(mp4|webm|ogg)$/i) ? (
+              {typeof product.images?.[0] === 'string' && product.images[0].match(/\.(mp4|webm|ogg)$/i) ? (
                 <div className="relative w-full sm:w-20 h-40 sm:h-20 bg-gray-100 rounded overflow-hidden">
                   <video src={getMediaUrl(product.images[0])} className="w-full h-full object-cover" />
                   <div className="absolute top-1 left-1 bg-black/60 p-0.5 rounded text-white">
@@ -271,6 +319,12 @@ const AdminProductsTab = ({ products, searchTerm, onSearchChange, refreshProduct
           </div>
         ))}
       </div>
+
+      <Pagination 
+        currentPage={page} 
+        totalPages={totalPages} 
+        onPageChange={setPage} 
+      />
 
       {/* Product Add/Edit Modal */}
       {isModalOpen && (

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../utils/api';
 import { useAuth } from './AuthContext';
@@ -38,42 +39,26 @@ export const CartProvider = ({ children }) => {
   };
 
   const addToCart = async (productId, quantity = 1) => {
-    try {
-      const res = await api.post('/cart', { productId, quantity });
-      setCart(res.data.cart);
-      return res.data;
-    } catch (error) {
-      throw error;
-    }
+    const res = await api.post('/cart', { productId, quantity });
+    setCart(res.data.cart);
+    return res.data;
   };
 
   const updateCartItem = async (itemId, quantity) => {
-    try {
-      const res = await api.put(`/cart/${itemId}`, { quantity });
-      setCart(res.data.cart);
-      return res.data;
-    } catch (error) {
-      throw error;
-    }
+    const res = await api.put(`/cart/${itemId}`, { quantity });
+    setCart(res.data.cart);
+    return res.data;
   };
 
   const removeFromCart = async (itemId) => {
-    try {
-      const res = await api.delete(`/cart/${itemId}`);
-      setCart(res.data.cart);
-      return res.data;
-    } catch (error) {
-      throw error;
-    }
+    const res = await api.delete(`/cart/${itemId}`);
+    setCart(res.data.cart);
+    return res.data;
   };
 
   const clearCart = async () => {
-    try {
-      await api.delete('/cart');
-      setCart({ items: [] });
-    } catch (error) {
-      throw error;
-    }
+    await api.delete('/cart');
+    setCart({ items: [] });
   };
 
   const cartItemCount = cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
